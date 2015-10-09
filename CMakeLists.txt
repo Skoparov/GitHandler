@@ -19,9 +19,11 @@ link_directories (${PROJECT_SOURCE_DIR}/LIB/)
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/BIN/)
 
 set (HEADERS 	${SOURCE_DIR}/gitupdater.h 
+                ${SOURCE_DIR}/githandler.h
 				${SOURCE_DIR}/include/git2.h)		
 				
 set (SOURCES 	${SOURCE_DIR}/gitupdater.cpp 
+                ${SOURCE_DIR}/githandler.cpp 
 				${SOURCE_DIR}/main.cpp)	 
 				
 set (QRC 		${SOURCE_DIR}/gitupdater.qrc)

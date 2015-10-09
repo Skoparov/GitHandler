@@ -4,7 +4,11 @@
 #include <QMainWindow>
 #include "ui_gitupdater.h"
 
-#include "include/git2.h"
+#include "GitHandler.h"
+
+//////////////////////////////////////////////////////////////////////////////
+///////////////				 GitUpdater				    //////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
 class GitUpdater : public QMainWindow
 {
@@ -13,7 +17,7 @@ class GitUpdater : public QMainWindow
 public:
 	GitUpdater(QWidget *parent = 0);
 	~GitUpdater();
-
+	
 private:
 	Ui::GitUpdaterClass ui;
 };
