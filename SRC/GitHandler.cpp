@@ -152,11 +152,15 @@ int GitHandler::fetch(GitRemotePtr remote, const git_fetch_options& opts)
 	return git_remote_download(remote->getItem(), NULL, &opts);
 }
 
-std::vector<GitCommitPtr> GitHandler::getBranchCommits(GitRefPtr branchRef)
+std::vector<GitCommitPtr> GitHandler::getBranchCommits(GitRefPtr branchRef, GitRepoPtr repo)
 {
 	std::vector<GitCommitPtr> stor;
 
-	if (!branchRef || !branchRef->getItem() ){
+	if (!repo || 
+		!repo->getItem() ||
+		!branchRef || 
+		!branchRef->getItem() )
+	{
 		return stor;
 	}		
 	
@@ -164,13 +168,13 @@ std::vector<GitCommitPtr> GitHandler::getBranchCommits(GitRefPtr branchRef)
 	git_revwalk *walker;
 	git_commit* commit;
 
-	git_revwalk_new(&walker, mRepo);
+	git_revwalk_new(&walker, repo->getItem());
 	git_revwalk_sorting(walker, GIT_SORT_TOPOLOGICAL);
 	git_revwalk_push(walker, &oid);
 
 	while (git_revwalk_next(&oid, walker) == 0)
 	{
-		if (git_commit_lookup(&commit, mRepo, &oid)){			
+		if (git_commit_lookup(&commit, repo->getItem(), &oid)){			
 			continue;
 		}
 

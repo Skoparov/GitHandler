@@ -63,8 +63,7 @@ typedef std::shared_ptr<GitRef> GitRefPtr;
 //////////////////////////////////////////////////////////////////////////////
 
 class GitHandler
-{
-	git_repository* mRepo;
+{	
 private:
 	int remoteLs(GitRemotePtr remote, std::vector<std::string>& refStor);
 	int defaultBranch(GitRemotePtr remote, std::string& branchName);
@@ -85,7 +84,7 @@ public:
 	GitRemotePtr initRemote(GitRepoPtr repo, const std::string& name, const git_fetch_options* opts);
 	int fetch(GitRemotePtr remote, const git_fetch_options& opts);
 
-	std::vector<GitCommitPtr> getBranchCommits(GitRefPtr branchRef);
+	std::vector<GitCommitPtr> getBranchCommits(GitRefPtr branchRef, GitRepoPtr repo);
 };
 
 #endif // GITHANDLER_H
