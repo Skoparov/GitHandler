@@ -1,21 +1,6 @@
 #include "GitUpdater.h"
 #include <QApplication>
 
-
-class testt
-{
-public:
-	~testt()
-	{
-		int i = 0;
-	}
-};
-
-void deleteTest(testt* i)
-{
-	delete i;
-}
-
 int main(int argc, char *argv[])
 {		
 	/*QApplication a(argc, argv);
@@ -23,10 +8,14 @@ int main(int argc, char *argv[])
 	w.show();
 	
 	return a.exec();*/
-	GitHandler h;
+	GitHandler h;	
 
-	Repo r("D:\\Test");
-	bool result = r.openLocalRepo();
+	Repo r;
+	bool result = r.openLocal("D:\\Test");
+	result = r.fetch();
+	r.print();
+
+	int i = 0;
 
 /*
 	GitHandler h;
@@ -34,7 +23,5 @@ int main(int argc, char *argv[])
 	const std::string url = "https://github.com/Skoparov/TestRepo.git";
 	const char* path = "D:\\Test";
 
-	auto repo = h.openLocalRepo(path);*/
-
-	int i = 0;
+	auto repo = h.openLocalRepo(path);*/	
 }

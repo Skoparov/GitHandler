@@ -4,7 +4,6 @@
 #include "Deleters.h"
 
 #include "memory"
-#include "string"
 #include "map"
 
 class Item;
@@ -23,21 +22,25 @@ public:
 template<class GitItemType, class Deleter>
 class GitItem : public Item
 {
+	typedef std::shared_ptr<GitItemType> ItemPtr;
+
 public:
 	GitItem(Deleter del) : mDeleter(del) {}
 
-	std::shared_ptr<GitItemType> item() {
+	void initItem(){
+		mItem = ItemPtr(new GitItemType, mDeleter);
+	}
+
+	ItemPtr item() {
 		return mItem;
 	};
 
-	void setItem(GitItemType* item)
-	{
-		if (mDeleter != nullptr){
-			mItem.reset(item, mDeleter);
-		}
-		else{
-			mItem.reset(item);
-		}
+	GitItemType* gitItem(){
+		return mItem.get();
+	}	
+
+	void setItem(GitItemType* item){		
+		mItem.reset(item, mDeleter);	
 	}
 	
 	bool isValid(){
@@ -58,7 +61,6 @@ class GitItemFactoryInterface
 {	
 public:
 	virtual ~GitItemFactoryInterface(){};
-
 	virtual ItemPtr create() = 0;	
 };
 
@@ -94,12 +96,13 @@ public:
 	template <class GitItemType, class Deleter>
 	bool registerItemType(const int& itemType, Deleter del)
 	{
-		if (mFactories.count(itemType) != 0){
-			return false;
-		}
+		if (!mFactories.count(itemType))
+		{
+			mFactories.insert(std::make_pair(itemType, std::make_shared<GitItemFactory<GitItemType, Deleter>>(del)));
+			return true;			
+		}	
 
-		mFactories.insert(std::make_pair(itemType, std::make_shared<GitItemFactory<GitItemType, Deleter>>(del)));
-		return true;
+		return false;
 	}	
 
 	template<class GitItemType>

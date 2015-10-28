@@ -7,22 +7,7 @@
 GitHandler::GitHandler()
 {
 	git_libgit2_init();	
-
 	registerItemTypes();
-}
-
-bool GitHandler::registerItemTypes()
-{
-	bool ok = true;
-	GitItemCreator& c = GitItemCreator::get();
-
-	ok &= c.registerItemType <git_repository, void(*)(git_repository*)>(GIT_REPO, &deleteRepo);
-	ok &= c.registerItemType <git_remote, void(*)(git_remote*)>(GIT_REMOTE, &deleteRemote);
-	ok &= c.registerItemType <git_commit, void(*)(git_commit*)>(GIT_COMMIT, &deleteCommit);
-	ok &= c.registerItemType <git_reference, void(*)(git_reference*)>(GIT_REF, &deleteRef);
-	ok &= c.registerItemType <git_strarray, void(*)(git_strarray*)>(GIT_STR_ARR, &deleteStrArr);
-
-	return ok;
 }
 
 bool GitHandler::addRepo(const RepoPtr repo)
@@ -43,36 +28,6 @@ int GitHandler::cloneRepo(GitRepoPtr repo, const std::string& url, const std::st
 	repo->setItem(r);
 
 	return result;
-}
-
-GitRemotePtr GitHandler::initRemote(GitRepoPtr repo, const std::string& name, const git_fetch_options* opts)
-{
-	GitRemotePtr remote = GitItemCreator::get().create<GitRemote>(GIT_REMOTE);		
-
-	try
-	{
-		if (!repo || !repo->isValid()){
-			throw std::exception("Repo is not initialized");
-		}
-
-		git_remote* r = remote->item().get();
-		if (git_remote_lookup(&r, repo->item().get(), name.c_str()) != 0){
-			throw std::exception("git_remote_lookup failed");
-		}
-
-		remote->setItem(r);
-
-		if (git_remote_connect(remote->item().get(), GIT_DIRECTION_FETCH, &opts->callbacks, NULL) != 0){
-			throw std::exception("git_remote_connect failed");
-		}
-	}
-	catch (const std::exception& e)
-	{
-		printf("Error init remote : %s\n", e.what());	
-		remote.reset();
-	}
-
-	return remote;
 }
 
 int GitHandler::remoteLs(GitRemotePtr remote, std::vector<std::string>& refStor)
@@ -123,158 +78,20 @@ std::string GitHandler::remoteName(GitRemotePtr remote)
 	return std::string(git_remote_name(remote->item().get()));
 }
 
-int GitHandler::progress_cb(const char *str, int len, void *data)
-{	
-	printf("remote: %.*s", len, str);
-	fflush(stdout); /* We don't have the \n to force the flush */
-	return 0;
-}
-
-int GitHandler::update_cb(const char *refname, const git_oid *oldHead, const git_oid *head, void *data)
+bool GitHandler::registerItemTypes()
 {
-	char a_str[GIT_OID_HEXSZ + 1], b_str[GIT_OID_HEXSZ + 1];
+	bool ok = true;
+	GitItemCreator& c = GitItemCreator::get();
 
-	git_oid_fmt(b_str, head);
-	b_str[GIT_OID_HEXSZ] = '\0';
+	ok &= c.registerItemType <git_repository, void(*)(git_repository*)>(GIT_REPO, &deleteRepo);
+	ok &= c.registerItemType <git_remote, void(*)(git_remote*)>(GIT_REMOTE, &deleteRemote);
+	ok &= c.registerItemType <git_commit, void(*)(git_commit*)>(GIT_COMMIT, &deleteCommit);
+	ok &= c.registerItemType <git_reference, void(*)(git_reference*)>(GIT_REF, &deleteRef);
+	ok &= c.registerItemType <git_strarray, void(*)(git_strarray*)>(GIT_STR_ARR, &deleteStrArr);
 
-	if (git_oid_iszero(oldHead)) {
-		printf("[new]     %.20s %s\n", b_str, refname);
-	}
-	else
-	{
-		/*git_commit* gcommit = nullptr;
-		const git_signature* sg = nullptr;
-		const char* message;
-		const char* author;
-
-		int res = git_commit_lookup(&gcommit, repo, oldHead);
-		if (res == 0)
-		{
-			message = git_commit_message(gcommit);
-			sg = git_commit_author(gcommit);
-			author = sg->name;
-
-			printf("Old head : %s | by %s in %s\n--------------------------- \n", message, author, refname);
-
-			git_commit_free(gcommit);
-		}
-
-		res = git_commit_lookup(&gcommit, repo, head);
-		if (res == 0)
-		{
-		message = git_commit_message(gcommit);
-		sg = git_commit_author(gcommit);
-		author = sg->name;
-
-		printf("Head commit : %s | by %s in %s\n--------------------------- \n", message, author, refname);
-
-		git_commit_free(gcommit);
-		}*/
-
-		git_oid_fmt(a_str, oldHead);
-		a_str[GIT_OID_HEXSZ] = '\0';
-		printf("[updated] %.10s..%.10s %s\n", a_str, b_str, refname);
-	}
-
-	return 0;
+	return ok;
 }
 
-int GitHandler::fetch(GitRemotePtr remote, const git_fetch_options& opts)
-{
-	return git_remote_download(remote->item().get(), NULL, &opts);
-}
-
-int GitHandler::getBranches(GitRepoPtr repo)
-{
-	int result = -1;
-
-	if (!repo ||!repo->item()){
-		return result;
-	}
-
-	git_strarray* arr = new git_strarray;
-	int res = git_reference_list(arr, repo->item().get());
-
-	std::vector<git_reference*> branches;
-	std::vector<git_reference*> remote_branches;
-
-	for (int i = 0; i < arr->count; ++i)
-	{
-		char* refName = arr->strings[i];
-		git_reference* ref = nullptr;
-
-		res = git_reference_lookup(&ref, repo->item().get(), refName);
-		if (git_reference_is_branch(ref))
-		{
-			printf("Branch : %s\n", git_reference_shorthand(ref));
-			branches.push_back(ref);
-		}
-		else if (git_reference_is_remote(ref))
-		{
-			printf("Remote : %s\n", git_reference_shorthand(ref));
-			remote_branches.push_back(ref);
-		}
-	}
-
-	return 0;
-}
-
-int GitHandler::getBranchCommits(GitRefPtr branchRef, GitRepoPtr repo, std::vector<GitCommitPtr>& commits)
-{
-	int result = -1;
-
-	if (!repo              || 
-		!repo->isValid()   ||
-		!branchRef         || 
-		!branchRef->isValid())
-	{
-		return result;
-	}		
-	
-	git_oid oid = refTarget(branchRef);	
-	git_revwalk *walker;
-	git_commit* commit;	
-
-	git_revwalk_new(&walker, repo->item().get());
-	git_revwalk_sorting(walker, GIT_SORT_TOPOLOGICAL);
-	git_revwalk_push(walker, &oid);
-
-	while (git_revwalk_next(&oid, walker) == 0)
-	{
-		if (git_commit_lookup(&commit, repo->item().get(), &oid)){			
-			continue;
-		}
-
-		auto commitPtr = GitItemCreator::get().create<GitCommit>(GIT_COMMIT);
-		commits.push_back(commitPtr);
-
-		//QString message(git_commit_message(commit));
-		//const git_signature* sg = git_commit_author(commit);		
-	}
-
-	git_revwalk_free(walker);
-
-	return 0;
-}
-
-std::string GitHandler::refName(GitRefPtr ref)
-{
-	if (!ref || !ref->isValid()){
-		return std::string();
-	}
-
-	return git_reference_shorthand(ref->item().get());
-}
-
-git_oid GitHandler::refTarget(GitRefPtr ref)
-{	
-	if (!ref || !ref->isValid()){
-		return git_oid();
-	}
-
-	const git_oid* result = git_reference_target(ref->item().get());
-	return result != nullptr ? *result : git_oid();
-}
 
 GitHandler::~GitHandler()
 {
@@ -287,17 +104,34 @@ GitHandler::~GitHandler()
 
 Commit::Commit(const git_time& time,
 	          const std::string author, 
-	          const std::string message, 
-			  const GitCommitPtr commitPtr,
-			  const BranchPtr parentBranch) : 
+	          const std::string message) : 
 
 			  mTime(time),
               mAuthor(author), 
-			  mMessage(message), 
-			  mCommitPtr(commitPtr),
-			  mParentBranch(parentBranch)
+			  mMessage(message)
 {
 
+}
+
+Commit::Commit(const Commit& other) : 
+               mTime(other.mTime),
+			   mAuthor(other.mAuthor),
+			   mMessage(other.mMessage)
+{
+
+}
+
+Commit& Commit::operator=(const Commit& other)
+{
+	if (&other == this){
+		return *this;
+	}
+
+	mTime = other.mTime;
+	mAuthor = other.mAuthor;
+	mMessage = other.mMessage;	
+
+	return *this;
 }
 
 void Commit::setTime(const git_time& time)
@@ -315,16 +149,6 @@ void Commit::setMessage(const std::string& message)
 	mMessage = message;
 }
 
-void Commit::setGitCommit(const GitCommitPtr commitPtr)
-{
-	mCommitPtr = commitPtr;
-}
-
-void Commit::setParentBranch(const BranchPtr parentBranch)
-{
-	mParentBranch = parentBranch;
-}
-
 std::string Commit::getAuthor() const
 {
 	return mAuthor;
@@ -333,16 +157,6 @@ std::string Commit::getAuthor() const
 std::string Commit::getMessage() const
 {
 	return mMessage;
-}
-
-GitCommitPtr Commit::getGitCommit() const
-{
-	return mCommitPtr;
-}
-
-ParentBranchPtr Commit::getParentBranch() const
-{
-	return mParentBranch;
 }
 
 git_time Commit::getTime() const
@@ -356,14 +170,38 @@ git_time Commit::getTime() const
 
 Branch::Branch(const std::string branchName, 
 	           const GitRefPtr branchRef, 
-			   const bool& isRemote, 
-			   const RepoPtr paretnRepo) :
+			   const bool& isRemote) :
 
                mBranchName(branchName), 
 			   mBranchRef(branchRef),
 			   mIsRemote(isRemote)
 {
 
+}
+
+Branch::Branch(const Branch& other) : 
+               mBranchName(other.mBranchName),
+			   mCommits(other.mCommits),
+			   mBranchRef(other.mBranchRef),
+			   mIsRemote(other.mIsRemote)
+{
+
+}
+
+Branch& Branch::operator=(const Branch& other)
+{	
+	Branch b(other.mBranchName, other.mBranchRef, other.mIsRemote);
+
+	if (&other == this){
+		return *this;
+	}
+
+	mBranchName = other.mBranchName;
+	mBranchRef = other.mBranchRef;
+	mIsRemote = other.mIsRemote;	
+	mCommits = other.mCommits;
+
+	return *this;
 }
 
 void Branch::setBranchName(const std::string& branchName)
@@ -378,8 +216,11 @@ void Branch::setRemote(const bool& isRemote)
 
 void Branch::addCommit(const CommitPtr commit)
 {
-	CommitId id(commit->getMessage(), commit->getTime().time);
-	mCommits.insert(std::make_pair(id, commit));
+	CommitId id(commit->getTime().time, commit->getMessage());
+
+	if (!mCommits.count(id)){
+		mCommits.insert(std::make_pair(id, commit));
+	}
 }
 
 void Branch::clearCommits()
@@ -411,143 +252,317 @@ bool Branch::isRemote() const
 ///////////////                   Repo                  //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Repo::Repo(const std::string& repoPath, 
-	       const std::string& repoUrl, 
-		   const GitRepoPtr repo, 
-		   const GitRemotePtr remote) : 
 
-           mPath(repoPath),
-           mUrl(repoUrl),
-           mRepo(repo),
-		   mRemote(remote)
+Repo::Repo(const std::string& repoPath, const GitRepoPtr repo) : 
+           mPath(repoPath),         
+           mRepo(repo)       
 {
 
 }
 
-bool Repo::openLocalRepo()
+Repo::Repo(const Repo& other) : 
+           mRepo(other.mRepo),
+           mUrl(other.mUrl),
+           mPath(other.mPath),                   
+           mLocalBranches(other.mLocalBranches)
 {
-	bool result = true;
 
-	mRepo = GitItemCreator::get().create<GitRepo>(GIT_REPO);		
+}
 
+Repo& Repo::operator=(const Repo& other)
+{
+	if (&other == this){
+		return *this;
+	}
+	
+	mPath = other.mPath;
+	mUrl = other.mUrl;
+	mRepo = other.mRepo;	
+	mLocalBranches = other.mLocalBranches;
+
+	return *this;
+}
+
+bool Repo::openLocal(const std::string& path)
+{
+	closeRepo();
+	mRepo = GitItemCreator::get().create<GitRepo>(GIT_REPO);
+	
 	if (mRepo == nullptr){
 		return false;
-	}	
-
-	auto repoPtr = mRepo->item().get();
-
-	if (git_repository_open(&repoPtr, mPath.c_str()) != 0)
-	{
-		printf("git_repository_open failed\n");
-		mRepo.reset();
-		result = false;
+	}
+		
+	git_repository* r;
+	if (git_repository_open(&r, path.c_str()) != 0){
+		return false;
 	}
 
-	mRepo->setItem(repoPtr);
+	mRepo->setItem(r);
+	mPath = path;
 
-	std::vector<std::string> d;
-	bool ok = getRemoteList(d);
-
-	return result;
+	return true;
 }
 
-void Repo::closeRepo()
-{
-	mRepo.reset();
-	mPath = std::string();
-	mUrl = std::string();
-	clearBranches();
-}
-
-void Repo::clearBranches()
-{
-	mLocalBranches.clear();
-	mRemoteBranches.clear();
-}
-
-bool Repo::getRemoteList(std::vector<std::string> remotes)
-{	
-	auto remoteList = GitItemCreator::get().create<GitStrArr>(GIT_STR_ARR);
-
-	if (!isValid() || !remoteList){
+bool Repo::updateRemotes()
+{		
+	if (!isValid())
+	{
+		printf("Init remotes : Repo not initialized");
 		return false;
 	}
 	
-	std::shared_ptr<git_strarray> remoteList1;
+	std::set<std::string> remotesList;
+	if (!readRemoteList(remotesList)){
+		return false;
+	}
 
-	{		
-		remoteList1 = std::shared_ptr<git_strarray>(new git_strarray(), deleteStrArr);
+	if (!remotesList.size())
+	{
+		printf("Init remotes : not remotes specified");
+		return true;
+	}
 
-		if (git_remote_list(remoteList1.get(), mRepo->item().get()) != 0){
-			return false;
+	for (auto remote = mRemotes.begin(); remote != mRemotes.end();)
+	{
+		if (!remotesList.count(remote->first))
+		{
+			mRemotes.erase(remote++);
+			printf("Init remotes : remote removed from the list: %s", remote->first.c_str());
+		}
+		else{
+			++remote;
+		}
+	}
+
+	git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
+	fetch_opts.callbacks.update_tips = &update_cb;
+	fetch_opts.callbacks.sideband_progress = &progress_cb;
+		
+	for (auto name : remotesList)
+	{
+		auto remoteStor = mRemotes.find(name);
+		if (remoteStor == mRemotes.end())
+		{
+			git_remote* remote = nullptr;
+			if (git_remote_lookup(&remote, mRepo->gitItem(), name.c_str()) != 0)
+			{
+				printf("Init remotes : git_remote_lookup failed for remote: %s", name);
+				continue;
+			}
+		
+			GitRemotePtr remotePtr = GitItemCreator::get().create<GitRemote>(GIT_REMOTE);
+			if (remotePtr == nullptr)
+			{
+				printf("Init remotes : Failed to create storage for remote: %s", name);
+				git_remote_free(remote);
+				continue;
+			}
+
+			remotePtr->setItem(remote);
+
+			if (git_remote_connect(remotePtr->gitItem(), GIT_DIRECTION_FETCH, &fetch_opts.callbacks, NULL) != 0)
+			{
+				printf("Init remotes : git_remote_connect failed for remote: %s", name);
+				continue;
+			}			
+
+			mRemotes.insert(std::make_pair(name, remotePtr));
+			printf("Init remotes : Remote added: %s\n", name.c_str());
+		}		
+	}
+
+	return true;
+}
+
+bool Repo::fetch()
+{	
+	if (!isValid())
+	{
+		printf("Fetch : Repo not initialized");
+		return false;
+	}
+
+	if (!updateRemotes()){
+		return false;
+	}
+
+	git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
+	auto a = &Repo::update_cb;
+	fetch_opts.callbacks.update_tips;
+		//&update_cb; 
+	fetch_opts.callbacks.sideband_progress = &this->progress_cb;
+
+	for (auto& remote : mRemotes)
+	{	
+		std::string remoteName = remote.first;
+
+		auto arr = createStrArr();
+		if (arr == nullptr)
+		{
+			printf("Fetch : Failed to create storage for remote: %s", remoteName.c_str());
+			continue;
 		}
 
-		for (size_t strNum = 0; strNum < remoteList1->count; ++strNum){
-			mOrigins.push_back(remoteList1->strings[strNum]);
-		}
+		if (git_remote_fetch(remote.second->gitItem(), arr->gitItem(), &fetch_opts, NULL) != 0)
+		{
+			printf("Fetch : git_remote_fetch failed for remote: %s", remoteName.c_str());
+			continue;
+		}	
+	}
+
+	if (!updateBranches()){
+		return false;
+	}
+
+	return true;
+}
+
+bool Repo::readRemoteList(std::set<std::string>& remotesList)
+{		
+	if (!isValid())
+	{
+		printf("Read remotes list : Repo not initialized\n");
+		return false;
+	}
+
+	auto remoteList = createStrArr();
+	if (remoteList == nullptr)
+	{
+		printf("Read remotes list : Failed to create storage for remotes\n");
+		return false;
+	}
+
+	if (git_remote_list(remoteList->gitItem(), mRepo->gitItem()) != 0)
+	{
+		printf("Read remotes list : git_remote_list failed\n");
+		return false;
+	}
+
+	for (size_t strNum = 0; strNum < remoteList->item()->count; ++strNum){
+		remotesList.insert(remoteList->item()->strings[strNum]);
 	}
 				
 	return true;
 }
 
-void Repo::setUrl(const std::string& repoUrl)
-{
-	mUrl = repoUrl;
+bool Repo::updateBranches()
+{	
+	if (!isValid())
+	{
+		printf("Update branches  : Repo not initialized\n");
+		return false;
+	}
+
+	auto arr = createStrArr();
+	if (arr == nullptr)
+	{
+		printf("Update branches : Failed to create storage for branches\n");
+		return false;
+	}
+
+	if (git_reference_list(arr->gitItem(), mRepo->gitItem()) != 0)
+	{
+		printf("Update branches : git_reference_list failed\n");
+		return false;
+	}
+
+	for (size_t refNUm = 0; refNUm < arr->item()->count; ++refNUm)
+	{
+		std::string refName = arr->item()->strings[refNUm];
+		if (mLocalBranches.count(refName) && mRemoteBranches.count(refName)){
+			continue;
+		}
+				
+		git_reference* ref = nullptr;
+		if (git_reference_lookup(&ref, mRepo->gitItem(), refName.c_str()) != 0)
+		{
+			printf("Update branches : git_reference_lookup failed for ref: %s\n", refName.c_str());
+			continue;
+		}
+
+		GitRefPtr refPtr = GitItemCreator::get().create<GitRef>(GIT_REF);
+		if (refPtr == nullptr)
+		{
+			printf("Update branches : Failed to create GitRefPtr for ref: %s\n", refName.c_str());
+			continue;
+		}
+
+		refPtr->setItem(ref);
+		std::string branchName = git_reference_shorthand(refPtr->gitItem());
+
+		if (git_reference_is_branch(refPtr->gitItem()))
+		{					
+			BranchPtr branch = std::make_shared<Branch>(branchName, refPtr, false);
+			mLocalBranches.insert(std::make_pair(branchName, branch));
+		}
+		else if (git_reference_is_remote(refPtr->gitItem()))
+		{
+			BranchPtr branch = std::make_shared<Branch>(branchName, refPtr, true);
+			mRemoteBranches.insert(std::make_pair(branchName, branch));
+		}
+	}
+
+	for (const auto& branch : mLocalBranches){
+		updateBranchCommits(branch.second);
+	}
+
+	for (const auto& branch : mRemoteBranches){
+		updateBranchCommits(branch.second);
+	}
+
+	return 0;
 }
 
-void Repo::setPath(const std::string& repoPath)
-{
-	mPath = repoPath;
-}
 
-void Repo::setRepo(const GitRepoPtr repo)
+bool Repo::updateBranchCommits(const BranchPtr branch)
 {
-	mRepo = repo;
-}
+	if (!isValid())
+	{
+		printf("Update branch commits  : Repo not initialized\n");
+		return false;
+	}
+	
+	git_oid* oid = const_cast<git_oid*>(git_reference_target(branch->getBranchRef()->gitItem()));
+	git_revwalk *walker;	
 
-void Repo::addLocalBranch(const BranchPtr branch)
-{
-	mLocalBranches.insert(std::make_pair(branch->getBranchName(), branch));
-}
+	git_revwalk_new(&walker, mRepo->gitItem());
+	git_revwalk_sorting(walker, GIT_SORT_TOPOLOGICAL);
+	git_revwalk_push(walker, oid);
 
-void Repo::addRemoteBranch(const BranchPtr branch)
-{
-	mRemoteBranches.insert(std::make_pair(branch->getBranchName(), branch));
-}
+	GitCommitPtr commitPtr = GitItemCreator::get().create<GitCommit>(GIT_COMMIT);
+	if (commitPtr == nullptr)
+	{
+		printf("Update branch commits  : Failed to create commit\n");
+		return false;
+	}
 
-std::string Repo::getUrl() const
-{
-	return mUrl;
-}
+	const CommitStorage& stor = branch->getCommits();
 
-std::string Repo::getPath() const
-{
-	return mPath;
-}
+	while (git_revwalk_next(oid, walker) == 0)
+	{
+		git_commit* commit;
+		if (git_commit_lookup(&commit, mRepo->gitItem(), oid))
+		{
+			printf("Update branch commits  : Failed to create commit\n");
+			continue;
+		}	
+		
+		commitPtr->setItem(commit);	
 
-GitRepoPtr Repo::getRepo() const
-{
-	return mRepo;
-}
+		const std::string message = git_commit_message(commitPtr->gitItem());
+		const git_signature* authorSig = git_commit_author(commitPtr->gitItem());	
 
-void Repo::setRemote(const GitRemotePtr remote)
-{
-	mRemote = remote;
-}
+		CommitId id(authorSig->when.time, message);
+		if (!stor.count(id))
+		{
+			CommitPtr cPtr = std::make_shared<Commit>(authorSig->when, authorSig->name, message);
+			branch->addCommit(cPtr);
+		}
+	}
 
-const BranchStorage& Repo::getLocalBranches() const
-{
-	return mLocalBranches;
-}
+	git_revwalk_free(walker);
 
-const BranchStorage& Repo::getRemoteBranches() const
-{
-	return mRemoteBranches;
-}
-
-GitRemotePtr Repo::getRemote() const
-{
-	return mRemote;
+	return 0;
 }
 
 bool Repo::isValid() const
@@ -555,4 +570,149 @@ bool Repo::isValid() const
 	return mRepo != nullptr &&
 		   mRepo->isValid() &&
 		   mPath.length();
+}
+
+void Repo::closeRepo()
+{
+	mRepo.reset();
+	mPath = std::string();
+	mUrl = std::string();
+	mLocalBranches.clear();
+	mRemotes.clear();
+}
+
+std::string Repo::getPath() const
+{
+	return mPath;
+}
+
+GitStrArrPtr Repo::createStrArr() const
+{
+	auto remoteList = GitItemCreator::get().create<GitStrArr>(GIT_STR_ARR);
+	if (remoteList != nullptr)
+	{
+		remoteList->initItem();
+		remoteList->item()->count = 0;
+	}
+
+	return remoteList;
+}
+
+int Repo::progress_cb(const char *str, int len, void *data)
+{
+	printf("remote: %.*s", len, str);
+	fflush(stdout); /* We don't have the \n to force the flush */
+	return 0;
+}
+
+int Repo::update_cb(const char *refname, const git_oid *oldHead, const git_oid *head, void *data)
+{
+	char a_str[GIT_OID_HEXSZ + 1], b_str[GIT_OID_HEXSZ + 1];
+
+	git_oid_fmt(b_str, head);
+	b_str[GIT_OID_HEXSZ] = '\0';
+	
+	if (git_oid_iszero(oldHead)) 
+	{
+		printf("[new]     %.20s %s\n", b_str, refname);
+
+	/*	git_reference* ref = nullptr;
+		if (git_reference_lookup(&ref, mRepo->gitItem(), refName.c_str()) != 0)
+		{
+
+		}
+
+		GitRefPtr refPtr = GitItemCreator::get().create<GitRef>(GIT_REF);
+		if (refPtr == nullptr)
+		{
+
+		}
+
+		refPtr->setItem(ref);
+		std::string branchName = git_reference_shorthand(refPtr->gitItem());
+		BranchPtr branch = std::make_shared<Branch>(branchName, refPtr, true);*/
+	}
+	else
+	{
+		/*git_commit* gcommit = nullptr;
+		const git_signature* sg = nullptr;
+		const char* message;
+		const char* author;
+
+		int res = git_commit_lookup(&gcommit, repo, oldHead);
+		if (res == 0)
+		{
+		message = git_commit_message(gcommit);
+		sg = git_commit_author(gcommit);
+		author = sg->name;
+
+		printf("Old head : %s | by %s in %s\n--------------------------- \n", message, author, refname);
+
+		git_commit_free(gcommit);
+		}
+
+		res = git_commit_lookup(&gcommit, repo, head);
+		if (res == 0)
+		{
+		message = git_commit_message(gcommit);
+		sg = git_commit_author(gcommit);
+		author = sg->name;
+
+		printf("Head commit : %s | by %s in %s\n--------------------------- \n", message, author, refname);
+
+		git_commit_free(gcommit);
+		}*/
+
+		git_oid_fmt(a_str, oldHead);
+		a_str[GIT_OID_HEXSZ] = '\0';
+		printf("[updated] %.10s..%.10s %s\n", a_str, b_str, refname);
+	}
+
+	return 0;
+}
+
+void Repo::print() const
+{
+	printf("\nBRANCHES\n\n");
+	for (auto& branch : mRemoteBranches)
+	{
+		printf("-------------------\n");
+		printf("%s\n", branch.first.c_str());
+		printf("-------------------\n\n");
+
+		auto commits = branch.second->getCommits();
+		for (auto commit = commits.rbegin(); commit != commits.rend(); ++ commit)
+		{
+			QString rawMessage(commit->second->getMessage().c_str());
+			QStringList l = rawMessage.split("\n", QString::SkipEmptyParts);
+			QString message = l.join("\n");
+
+			QDateTime dtime = QDateTime::fromMSecsSinceEpoch(commit->second->getTime().time * 1000);
+			QString time = dtime.toString(Qt::ISODate).replace("T", " ");
+			message.prepend(QString("[%1] %2\n").arg(time).arg(commit->second->getAuthor().c_str()));
+					
+			printf("%s\n\n", message.toStdString().c_str());
+		}
+	}
+
+	for (auto& branch : mLocalBranches)
+	{
+		printf("-------------------\n");
+		printf("%s\n", branch.first.c_str());
+		printf("-------------------\n\n");
+
+		auto commits = branch.second->getCommits();
+		for (auto commit = commits.rbegin(); commit != commits.rend(); ++commit)
+		{
+			QString rawMessage(commit->second->getMessage().c_str());
+			QStringList l = rawMessage.split("\n", QString::SkipEmptyParts);
+			QString message = l.join("\n");
+
+			QDateTime dtime = QDateTime::fromMSecsSinceEpoch(commit->second->getTime().time * 1000);
+			QString time = dtime.toString(Qt::ISODate).replace("T", " ");
+			message.prepend(QString("[%1] %2\n").arg(time).arg(commit->second->getAuthor().c_str()));
+
+			printf("%s\n\n", message.toStdString().c_str());
+		}
+	}
 }
