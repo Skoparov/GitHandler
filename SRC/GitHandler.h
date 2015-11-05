@@ -6,11 +6,15 @@
 #include <set>
 #include <string>
 #include <functional>
-#include <QString>
-#include <QStringList>
-#include <QDateTime>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
+#include <boost/date_time/gregorian/gregorian_types.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "GitItemFactory.h"
+
+using namespace boost::posix_time;
 
 class Commit;
 class Branch;
@@ -142,10 +146,11 @@ private:
 	bool updateBranchCommits(const BranchPtr branch);
 
 	GitStrArrPtr createStrArr() const;
+	std::string getCommitMessageStr(CommitPtr commit) const;
 
 	//callbacks with params determined by the lib
-	 static int progress_cb(const char *str, int len, void *data);
-	 static int update_cb(const char *refname, const git_oid *oldHead, const git_oid *head, void *data);
+	static int progress_cb(const char *str, int len, void *data);
+	static int update_cb(const char *refname, const git_oid *oldHead, const git_oid *head, void *data);
 
 private:	
 	GitRepoPtr mRepo;	

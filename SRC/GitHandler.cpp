@@ -598,6 +598,32 @@ GitStrArrPtr Repo::createStrArr() const
 	return remoteList;
 }
 
+std::string Repo::getCommitMessageStr(CommitPtr commit) const
+{
+	if (commit == nullptr){
+		return std::string();
+	}
+
+	std::string rawMessage = commit->getMessage();
+	std::vector<std::string> parts;
+	boost::split(parts, rawMessage, boost::is_any_of("\n"));
+	rawMessage = boost::join_if(parts,
+		                        "\n",
+		                        [](const std::string& str)->bool
+	                            {return !str.length(); });
+
+
+	time_duration td(0, 0, 0, time_duration::ticks_per_second() * commit->getTime().time);
+	ptime dtime = ptime(boost::gregorian::date(1970, 1, 1), td);
+
+	std::string message = (boost::format("[%s] %s\n")
+		                   % dtime
+		                   % commit->getAuthor()).str();
+
+	message += rawMessage;
+	return message;
+}
+
 int Repo::progress_cb(const char *str, int len, void *data)
 {
 	printf("remote: %.*s", len, str);
@@ -683,15 +709,9 @@ void Repo::print() const
 		auto commits = branch.second->getCommits();
 		for (auto commit = commits.rbegin(); commit != commits.rend(); ++ commit)
 		{
-			QString rawMessage(commit->second->getMessage().c_str());
-			QStringList l = rawMessage.split("\n", QString::SkipEmptyParts);
-			QString message = l.join("\n");
-
-			QDateTime dtime = QDateTime::fromMSecsSinceEpoch(commit->second->getTime().time * 1000);
-			QString time = dtime.toString(Qt::ISODate).replace("T", " ");
-			message.prepend(QString("[%1] %2\n").arg(time).arg(commit->second->getAuthor().c_str()));
-					
-			printf("%s\n\n", message.toStdString().c_str());
+		
+			std::string message = getCommitMessageStr(commit->second);
+			printf("%s\n\n", message.c_str());		
 		}
 	}
 
@@ -704,15 +724,8 @@ void Repo::print() const
 		auto commits = branch.second->getCommits();
 		for (auto commit = commits.rbegin(); commit != commits.rend(); ++commit)
 		{
-			QString rawMessage(commit->second->getMessage().c_str());
-			QStringList l = rawMessage.split("\n", QString::SkipEmptyParts);
-			QString message = l.join("\n");
-
-			QDateTime dtime = QDateTime::fromMSecsSinceEpoch(commit->second->getTime().time * 1000);
-			QString time = dtime.toString(Qt::ISODate).replace("T", " ");
-			message.prepend(QString("[%1] %2\n").arg(time).arg(commit->second->getAuthor().c_str()));
-
-			printf("%s\n\n", message.toStdString().c_str());
+			std::string message = getCommitMessageStr(commit->second);
+			printf("%s\n\n", message.c_str());
 		}
 	}
 }

@@ -1,22 +1,14 @@
-#include "GitUpdater.h"
-#include <QApplication>
+#include "githandler.h"
+#include <iostream>
 
 int main(int argc, char *argv[])
-{		
-	/*QApplication a(argc, argv);
-	GitUpdater w;
-	w.show();
-	
-	return a.exec();*/
+{			
 	GitHandler h;	
 
 	Repo r;
 	bool result = r.openLocal("D:\\Test");
 	result = r.fetch();
 	r.print();
-
-	int i = 0;
-
 /*
 	GitHandler h;
 
