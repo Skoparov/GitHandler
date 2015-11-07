@@ -129,24 +129,32 @@ public:
 	Repo(const Repo& other);
 	Repo& operator=(const Repo& other);
 	
-	/**<  repo operations */
+	//  repo operations
 	bool openLocal(const std::string& path);
 	bool fetch();	
-	void closeRepo();
+	void closeRepo();	
+
+	// getters	
+	BranchStorage getLocalBranches() const;
+	BranchStorage getRemoteBranches() const;
 
 	std::string getPath() const;
-	bool isValid() const;		
+	std::string getUrl() const;
+	bool isValid() const;
 
-	void print() const;
+	//aux
+	void printBranches() const;
+	void printBranchCommits(const std::string& branchName) const;
 
-private:
-	bool readRemoteList(std::set<std::string>& remotesList);	
+private:	
 	bool updateRemotes();
-	bool updateBranches();
+	bool updateBranches();	
 	bool updateBranchCommits(const BranchPtr branch);
-
+	bool readRemotesList(std::set<std::string>& remotesList);
+	
 	GitStrArrPtr createStrArr() const;
-	std::string getCommitMessageStr(CommitPtr commit) const;
+	BranchPtr getBranch(const std::string& branchName) const;
+	std::string getCommitMessageStr(CommitPtr commit) const;	
 
 	//callbacks with params determined by the lib
 	static int progress_cb(const char *str, int len, void *data);

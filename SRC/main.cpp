@@ -6,9 +6,16 @@ int main(int argc, char *argv[])
 	GitHandler h;	
 
 	Repo r;
+	//bool result = r.openLocal("D:\\Repo\\libgit2");
 	bool result = r.openLocal("D:\\Test");
 	result = r.fetch();
-	r.print();
+
+	r.printBranches();
+
+	auto branches = r.getLocalBranches();
+	auto branch = branches.begin()->first;
+
+	r.printBranchCommits("test");
 
 	std::cin.get();
 /*

@@ -312,7 +312,7 @@ bool Repo::updateRemotes()
 	}
 	
 	std::set<std::string> remotesList;
-	if (!readRemoteList(remotesList)){
+	if (!readRemotesList(remotesList)){
 		return false;
 	}
 
@@ -393,8 +393,9 @@ bool Repo::fetch()
 	fetch_opts.callbacks.sideband_progress = &this->progress_cb;
 
 	for (auto& remote : mRemotes)
-	{	
+	{			
 		std::string remoteName = remote.first;
+		printf("Fetching : %s\n", remoteName.c_str());
 
 		auto arr = createStrArr();
 		if (arr == nullptr)
@@ -417,7 +418,7 @@ bool Repo::fetch()
 	return true;
 }
 
-bool Repo::readRemoteList(std::set<std::string>& remotesList)
+bool Repo::readRemotesList(std::set<std::string>& remotesList)
 {		
 	if (!isValid())
 	{
@@ -494,21 +495,29 @@ bool Repo::updateBranches()
 		{					
 			BranchPtr branch = std::make_shared<Branch>(branchName, refPtr, false);
 			mLocalBranches.insert(std::make_pair(branchName, branch));
+			printf("Added local branch: %s\n", branchName.c_str());
 		}
 		else if (git_reference_is_remote(refPtr->gitItem()))
 		{
 			BranchPtr branch = std::make_shared<Branch>(branchName, refPtr, true);
 			mRemoteBranches.insert(std::make_pair(branchName, branch));
+			printf("Added remote branch: %s\n", branchName.c_str());
 		}
 	}
 
-	for (const auto& branch : mLocalBranches){
+	for (const auto& branch : mLocalBranches)
+	{
+		printf("Updating branch commits for branch: %s\r", branch.first.c_str());
 		updateBranchCommits(branch.second);
 	}
 
-	for (const auto& branch : mRemoteBranches){
+	for (const auto& branch : mRemoteBranches)
+	{
+		printf("Updating branch commits for branch: %s\r", branch.first.c_str());
 		updateBranchCommits(branch.second);
 	}
+
+	printf("\n");
 
 	return 0;
 }
@@ -585,9 +594,24 @@ void Repo::closeRepo()
 	mRemotes.clear();
 }
 
+BranchStorage Repo::getLocalBranches() const
+{
+	return mLocalBranches;
+}
+
+BranchStorage Repo::getRemoteBranches() const
+{
+	return mRemoteBranches;
+}
+
 std::string Repo::getPath() const
 {
 	return mPath;
+}
+
+std::string Repo::getUrl() const
+{
+	return mUrl;
 }
 
 GitStrArrPtr Repo::createStrArr() const
@@ -600,6 +624,29 @@ GitStrArrPtr Repo::createStrArr() const
 	}
 
 	return remoteList;
+}
+
+BranchPtr Repo::getBranch(const std::string& branchName) const
+{
+	BranchPtr result;
+
+	if (!branchName.length()){
+		return result;
+	}
+
+	auto branchIter = mLocalBranches.find(branchName);
+	if (branchIter != mLocalBranches.end()){
+		result = branchIter->second;
+	}
+	else
+	{
+		branchIter = mRemoteBranches.find(branchName);
+		if (branchIter != mRemoteBranches.end()){
+			result = branchIter->second;
+		}
+	}
+	
+	return result;
 }
 
 std::string Repo::getCommitMessageStr(CommitPtr commit) const
@@ -617,7 +664,8 @@ std::string Repo::getCommitMessageStr(CommitPtr commit) const
 	                            {return str.length();});
 
 
-	time_duration td(0, 0, 0, time_duration::ticks_per_second() * commit->getTime().time);
+	auto commitTime = commit->getTime();
+	time_duration td(0, 0, 0, time_duration::ticks_per_second() * (commitTime.time + commitTime.offset*60));
 	ptime dtime = ptime(boost::gregorian::date(1970, 1, 1), td);
 
 	std::string message = (boost::format("[%s]\n%s\n%s\n\n")
@@ -701,35 +749,36 @@ int Repo::update_cb(const char *refname, const git_oid *oldHead, const git_oid *
 	return 0;
 }
 
-void Repo::print() const
+void Repo::printBranches() const
 {
-	printf("\nBRANCHES\n\n");
-	for (auto& branch : mRemoteBranches)
-	{		
-		printf("-------------------\n");
-		printf("%s\n", branch.first.c_str());
-		printf("-------------------\n\n");
-
-		auto commits = branch.second->getCommits();
-		for (auto commit = commits.rbegin(); commit != commits.rend(); ++ commit)
-		{
-		
-			std::string message = getCommitMessageStr(commit->second);
-			printf("%s", message.c_str());		
-		}
+	printf("\n-------------------\n");
+	printf("%s\n", "BRANCHES");
+	printf("-------------------\n\n");
+	for (auto& branch : mRemoteBranches){		
+		printf("%s\n", branch.first.c_str());		
 	}
 
-	for (auto& branch : mLocalBranches)
-	{
-		printf("-------------------\n");
+	for (auto& branch : mLocalBranches){
 		printf("%s\n", branch.first.c_str());
+	}
+}
+
+void Repo::printBranchCommits(const std::string& branchName) const
+{	
+	auto branch = getBranch(branchName);
+
+	if (branch != nullptr)
+	{
+		printf("\n-------------------\n");
+		printf("%s\n", branch->getBranchName().c_str());
 		printf("-------------------\n\n");
 
-		auto commits = branch.second->getCommits();
+		auto commits = branch->getCommits();
 		for (auto commit = commits.rbegin(); commit != commits.rend(); ++commit)
 		{
+
 			std::string message = getCommitMessageStr(commit->second);
 			printf("%s", message.c_str());
 		}
-	}
+	}	
 }
