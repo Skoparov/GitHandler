@@ -523,6 +523,10 @@ bool Repo::updateBranchCommits(const BranchPtr branch)
 	}
 	
 	git_oid* oid = const_cast<git_oid*>(git_reference_target(branch->getBranchRef()->gitItem()));
+	if (oid == nullptr){
+		return false;
+	}
+
 	git_revwalk *walker;	
 
 	git_revwalk_new(&walker, mRepo->gitItem());
@@ -610,17 +614,17 @@ std::string Repo::getCommitMessageStr(CommitPtr commit) const
 	rawMessage = boost::join_if(parts,
 		                        "\n",
 		                        [](const std::string& str)->bool
-	                            {return !str.length(); });
+	                            {return str.length();});
 
 
 	time_duration td(0, 0, 0, time_duration::ticks_per_second() * commit->getTime().time);
 	ptime dtime = ptime(boost::gregorian::date(1970, 1, 1), td);
 
-	std::string message = (boost::format("[%s] %s\n")
+	std::string message = (boost::format("[%s]\n%s\n%s\n\n")
 		                   % dtime
+						   % rawMessage
 		                   % commit->getAuthor()).str();
 
-	message += rawMessage;
 	return message;
 }
 
@@ -701,7 +705,7 @@ void Repo::print() const
 {
 	printf("\nBRANCHES\n\n");
 	for (auto& branch : mRemoteBranches)
-	{
+	{		
 		printf("-------------------\n");
 		printf("%s\n", branch.first.c_str());
 		printf("-------------------\n\n");
@@ -711,7 +715,7 @@ void Repo::print() const
 		{
 		
 			std::string message = getCommitMessageStr(commit->second);
-			printf("%s\n\n", message.c_str());		
+			printf("%s", message.c_str());		
 		}
 	}
 
@@ -725,7 +729,7 @@ void Repo::print() const
 		for (auto commit = commits.rbegin(); commit != commits.rend(); ++commit)
 		{
 			std::string message = getCommitMessageStr(commit->second);
-			printf("%s\n\n", message.c_str());
+			printf("%s", message.c_str());
 		}
 	}
 }

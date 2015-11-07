@@ -9,6 +9,8 @@ int main(int argc, char *argv[])
 	bool result = r.openLocal("D:\\Test");
 	result = r.fetch();
 	r.print();
+
+	std::cin.get();
 /*
 	GitHandler h;
 
