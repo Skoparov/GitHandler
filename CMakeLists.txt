@@ -27,12 +27,15 @@ include_directories(${CMAKE_BINARY_DIR})
 
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/BIN/)
 
-set (HEADERS 	${SOURCE_DIR}/GitItemFactory.h 
-				${SOURCE_DIR}/Deleters.h
-                ${SOURCE_DIR}/githandler.h
+set (HEADERS 	${SOURCE_DIR}/GitDeleters.h	
+                ${SOURCE_DIR}/GitItem.h
+                ${SOURCE_DIR}/GitItemFactory.h 						
+				${SOURCE_DIR}/GitBaseClasses.h
+                ${SOURCE_DIR}/GitHandler.h
 				${SOURCE_DIR}/include/git2.h)		
 				
-set (SOURCES 	${SOURCE_DIR}/githandler.cpp 
+set (SOURCES 	${SOURCE_DIR}/GitBaseClasses.cpp 
+                ${SOURCE_DIR}/GitHandler.cpp                
 				${SOURCE_DIR}/main.cpp)	
 
 #Boost				

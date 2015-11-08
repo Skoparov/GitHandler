@@ -3,26 +3,33 @@
 
 int main(int argc, char *argv[])
 {			
-	GitHandler h;	
-
-	Repo r;
-	//bool result = r.openLocal("D:\\Repo\\libgit2");
-	bool result = r.openLocal("D:\\Test");
-	result = r.fetch();
-
-	r.printBranches();
-
-	auto branches = r.getLocalBranches();
-	auto branch = branches.begin()->first;
-
-	r.printBranchCommits("test");
-
-	std::cin.get();
-/*
 	GitHandler h;
+	string path = "D:\\Test";
+	//string path = "D:\\Repo\\libgit2";	
 
-	const std::string url = "https://github.com/Skoparov/TestRepo.git";
-	const char* path = "D:\\Test";
+			
+	RepoPtr repo = std::make_shared<Repo>();
+	bool result = repo->openLocal(path);
+	h.addRepo(repo);
 
-	auto repo = h.openLocalRepo(path);*/	
+	int sad = repo.use_count();
+	
+	h.update();		
+
+	/*auto repoPtr = h.getRepo(path);
+	if (repoPtr != nullptr)
+	{
+		BranchStorage locals;
+		if (repoPtr->getBranches(locals))
+		{
+			Aux::printBranches(locals);
+			for (auto branch : locals){
+				Aux::printBranchCommits(branch.second);
+			}
+		}
+	}*/
+
+	h.printNew();
+	
+	std::cin.get();
 }

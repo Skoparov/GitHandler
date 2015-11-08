@@ -1,57 +1,8 @@
 #ifndef GITITEMFACTORY_H
 #define GITITEMFACTORY_H
 
-#include "Deleters.h"
-
-#include "memory"
 #include "map"
-
-class Item;
-typedef std::shared_ptr<Item> ItemPtr;
-
-//////////////////////////////////////////////////////////////////////////////
-///////////////				     GitItem				//////////////////////
-//////////////////////////////////////////////////////////////////////////////
-
-class Item
-{
-public: 
-	virtual ~Item() {}; 
-};
-
-template<class GitItemType, class Deleter>
-class GitItem : public Item
-{
-	typedef std::shared_ptr<GitItemType> ItemPtr;
-
-public:
-	GitItem(Deleter del) : mDeleter(del) {}
-
-	void initItem(){
-		mItem = ItemPtr(new GitItemType, mDeleter);
-	}
-
-	ItemPtr item() {
-		return mItem;
-	};
-
-	GitItemType* gitItem(){
-		return mItem.get();
-	}	
-
-	void setItem(GitItemType* item){		
-		mItem.reset(item, mDeleter);	
-	}
-	
-	bool isValid(){
-		return mItem != nullptr; 
-	}	
-
-private:
-	std::shared_ptr<GitItemType> mItem;
-	Deleter mDeleter;
-};
-
+#include "GitItem.h"
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////           GitItemFactoryInterface       //////////////////////
@@ -90,15 +41,16 @@ private:
 
 class GitItemCreator
 {
-	typedef std::shared_ptr<GitItemFactoryInterface> FactoryPtr;
+	typedef std::map<int, std::shared_ptr<GitItemFactoryInterface>> FactoryStorage;
 
 public:
 	template <class GitItemType, class Deleter>
-	bool registerItemType(const int& itemType, Deleter del)
+	static bool registerItemType(const int& itemType, Deleter del)
 	{
 		if (!mFactories.count(itemType))
 		{
-			mFactories.insert(std::make_pair(itemType, std::make_shared<GitItemFactory<GitItemType, Deleter>>(del)));
+			auto factoryData = std::make_pair(itemType, std::make_shared<GitItemFactory<GitItemType, Deleter>>(del));
+			mFactories.insert(factoryData);
 			return true;			
 		}	
 
@@ -106,7 +58,7 @@ public:
 	}	
 
 	template<class GitItemType>
-	std::shared_ptr<GitItemType> create(const int& itemType)
+	static std::shared_ptr<GitItemType> create(const int& itemType)
 	{
 		std::shared_ptr<GitItemType> item;
 
@@ -116,16 +68,12 @@ public:
 		}		
 
 		return item;
-	}
-
-	static GitItemCreator& get()
-	{
-		static GitItemCreator instance;
-		return instance;
-	}
+	}	
 
 private:
-	std::map<int, FactoryPtr> mFactories;
+	static FactoryStorage mFactories;
 };
+
+__declspec(selectany) GitItemCreator::FactoryStorage GitItemCreator::mFactories;
 
 #endif
