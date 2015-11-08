@@ -224,23 +224,20 @@ bool Repo::updateRemotes(const git_fetch_options& fetch_opts)
 		return false;
 	}
 
-	if (!remotesList.size())
-	{
-		printf("Init remotes : not remotes specified");
+	if (!remotesList.size()){	
 		return true;
 	}
 
 	for (auto remote = mRemotes.begin(); remote != mRemotes.end();)
 	{
-		if (!remotesList.count(remote->first))
-		{
-			mRemotes.erase(remote);
-			printf("Init remotes : remote removed from the list: %s", remote->first.c_str());
+		if (!remotesList.count(remote->first)){
+			mRemotes.erase(remote);		
 		}
 		
 		remote++;		
 	}		
 		
+	bool result = true;
 	for (auto name : remotesList)
 	{
 		auto remoteStor = mRemotes.find(name);
@@ -248,58 +245,49 @@ bool Repo::updateRemotes(const git_fetch_options& fetch_opts)
 		{
 			git_remote* remote = nullptr;
 			if (git_remote_lookup(&remote, mGitRepo->gitItem(), name.c_str()) != 0){				
-				continue;
+				return false;
 			}
 		
 			GitRemotePtr remotePtr = GitItemCreator::get().create<GitRemote>(GIT_REMOTE);
 			if (remotePtr == nullptr)
 			{				
 				git_remote_free(remote);
-				continue;
+				return false;
 			}
 
 			remotePtr->setItem(remote);
-
 			if (git_remote_connect(remotePtr->gitItem(), GIT_DIRECTION_FETCH, &fetch_opts.callbacks, NULL) != 0){				
-				continue;
+				return false;
 			}			
 
-			mRemotes.insert(std::make_pair(name, remotePtr));
-			printf("Init remotes : Remote added: %s\n", name.c_str());
+			mRemotes.insert(std::make_pair(name, remotePtr));		
 		}		
-	}
+	}	
 
 	return true;
 }
 
 bool Repo::fetch(const git_fetch_options& fetch_opts)
 {	
-	if (!isValid())
-	{
-		printf("Fetch : Repo not initialized");
+	if (!isValid()){	
 		return false;
 	}
 	
 	if (!updateRemotes(fetch_opts)){
 		return false;
 	}	
-
+	
 	for (auto& remote : mRemotes)
 	{
-		string remoteName = remote.first;
-		printf("Fetching : %s\n", remoteName.c_str());
+		string remoteName = remote.first;	
 
 		auto arr = Aux::createStrArr();
-		if (arr == nullptr)
-		{
-			printf("Fetch : Failed to create storage for remote: %s", remoteName.c_str());
-			continue;
+		if (arr == nullptr){
+			return false;
 		}
 
-		if (git_remote_fetch(remote.second->gitItem(), arr->gitItem(), &fetch_opts, NULL) != 0)
-		{
-			printf("Fetch : git_remote_fetch failed for remote: %s", remoteName.c_str());
-			continue;
+		if (git_remote_fetch(remote.second->gitItem(), arr->gitItem(), &fetch_opts, NULL) != 0){			
+			return false;
 		}
 	}
 
@@ -311,36 +299,28 @@ bool Repo::clone(const string& url, const string& path, const git_clone_options&
 	closeRepo();
 
 	GitRepoPtr repo;
-	bool result = false;
-
+	
 	git_repository* r = repo->item().get();
-	if (git_clone(&r, url.c_str(), path.c_str(), &cloneOpts) == 0)
-	{
-		repo->setItem(r);
-		result = true;
+	if (git_clone(&r, url.c_str(), path.c_str(), &cloneOpts) != 0){
+		return false;
 	}
-
-	return result;
+	
+	repo->setItem(r);
+	return true;
 }
 
 bool Repo::readRemotesList(RemotesList& remotesList)
 {		
-	if (!isValid())
-	{
-		printf("Read remotes list : Repo not initialized\n");
+	if (!isValid()){	
 		return false;
 	}
 
 	auto remoteList = Aux::createStrArr();
-	if (remoteList == nullptr)
-	{
-		printf("Read remotes list : Failed to create storage for remotes\n");
+	if (remoteList == nullptr){	
 		return false;
 	}
 
-	if (git_remote_list(remoteList->gitItem(), mGitRepo->gitItem()) != 0)
-	{
-		printf("Read remotes list : git_remote_list failed\n");
+	if (git_remote_list(remoteList->gitItem(), mGitRepo->gitItem()) != 0){		
 		return false;
 	}
 
@@ -440,9 +420,9 @@ bool Repo::getBranches(BranchStorage& branchStorage, const bool& getRemotes /*= 
 
 		GitRefPtr refPtr = Aux::getReference(refName, mGitRepo);
 		if (refPtr == nullptr)
-		{
-			printf("Get local branches: Failed to create GitRefPtr for ref: %s\n", refName.c_str());
-			continue;
+		{		
+			branchStorage.clear();
+			return false;
 		}
 
 		int (*checkFunc)(const git_reference *) = getRemotes?
@@ -475,6 +455,7 @@ BranchPtr Repo::getBranch(const string& refName)
 	{
 		bool isRemote = false;
 		bool isLocal = git_reference_is_branch(refPtr->gitItem());
+
 		if (!isLocal){
 			isRemote = git_reference_is_remote(refPtr->gitItem());
 		}
@@ -504,8 +485,8 @@ string Repo::path() const
 bool Repo::isValid() const
 {
 	return mGitRepo != nullptr &&
-		mGitRepo->isValid() &&
-		mLocalPath.length();
+		   mGitRepo->isValid() &&
+		   mLocalPath.length();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -544,9 +525,9 @@ string Aux::getCommitMessageStr(CommitPtr commit)
 	ptime dtime = ptime(boost::gregorian::date(1970, 1, 1), td);
 
 	string message = (boost::format("[%s]\n%s\n%s\n\n")
-		% dtime
-		% rawMessage
-		% commit->author()).str();
+		              % dtime
+		              % rawMessage
+		              % commit->author()).str();
 
 	return message;
 }
@@ -571,7 +552,8 @@ GitCommitPtr Aux::readCommit(const RepoPtr repo, const git_oid *head)
 	GitCommitPtr commit;
 	git_commit* gitCommit;
 
-	if (head != nullptr && 
+	if (repo != nullptr && 
+		head != nullptr && 
 		git_commit_lookup(&gitCommit, repo->gitRepo()->gitItem(), head) == 0)
 	{
 		commit = GitItemCreator::get().create<GitCommit>(GIT_COMMIT);

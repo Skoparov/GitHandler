@@ -2,7 +2,6 @@
 #define GITBASECLASSES_H
 
 #include <set>
-#include <mutex>
 
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
@@ -142,9 +141,6 @@ public:
 	static void printBranches(const BranchStorage& storage);
 	static void printCommit(const  CommitPtr commit);
 	static void printBranchCommits(const BranchPtr branch);
-
-private:
-	std::mutex mMutex;
 };
 
 #endif // GITBASECLASSES_H
