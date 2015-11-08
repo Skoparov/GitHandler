@@ -45,7 +45,7 @@ class GitItemCreator
 
 public:
 	template <class GitItemType, class Deleter>
-	static bool registerItemType(const int& itemType, Deleter del)
+	bool registerItemType(const int& itemType, Deleter del)
 	{
 		if (!mFactories.count(itemType))
 		{
@@ -58,7 +58,7 @@ public:
 	}	
 
 	template<class GitItemType>
-	static std::shared_ptr<GitItemType> create(const int& itemType)
+	std::shared_ptr<GitItemType> create(const int& itemType)
 	{
 		std::shared_ptr<GitItemType> item;
 
@@ -68,12 +68,16 @@ public:
 		}		
 
 		return item;
-	}	
+	}
+
+	static GitItemCreator& get()
+	{
+		static GitItemCreator creator;
+		return creator;
+	}
 
 private:
-	static FactoryStorage mFactories;
+	FactoryStorage mFactories;
 };
-
-__declspec(selectany) GitItemCreator::FactoryStorage GitItemCreator::mFactories;
 
 #endif

@@ -45,6 +45,19 @@ string Commit::message() const
 	return message;
 }
 
+git_oid Commit::id() const
+{
+	git_oid id;
+
+	if (isValid())
+	{
+		const git_oid* cId = git_commit_id(mCommit->gitItem());
+		id = *cId;		
+	}
+
+	return id;
+}
+
 GitCommitPtr Commit::commit() const
 {
 	return mCommit;
@@ -184,7 +197,7 @@ bool Repo::openLocal(const string& path)
 {
 	closeRepo();
 
-	mGitRepo = GitItemCreator::create<GitRepo>(GIT_REPO);	
+	mGitRepo = GitItemCreator::get().create<GitRepo>(GIT_REPO);	
 	if (mGitRepo == nullptr){
 		return false;
 	}
@@ -238,7 +251,7 @@ bool Repo::updateRemotes(const git_fetch_options& fetch_opts)
 				continue;
 			}
 		
-			GitRemotePtr remotePtr = GitItemCreator::create<GitRemote>(GIT_REMOTE);
+			GitRemotePtr remotePtr = GitItemCreator::get().create<GitRemote>(GIT_REMOTE);
 			if (remotePtr == nullptr)
 			{				
 				git_remote_free(remote);
@@ -356,7 +369,7 @@ bool Repo::readBranchCommits(const BranchPtr branch)
 		return false;
 	}
 	
-	walker = GitItemCreator::create<GitRevWalk>(GIT_REV_WALK);
+	walker = GitItemCreator::get().create<GitRevWalk>(GIT_REV_WALK);
 	if (walker == nullptr){
 		return false;
 	}
@@ -364,15 +377,9 @@ bool Repo::readBranchCommits(const BranchPtr branch)
 	walker->setItem(gitWalker);
 	git_revwalk_sorting(walker->gitItem(), GIT_SORT_TOPOLOGICAL);
 	git_revwalk_push(walker->gitItem(), oid);
-		
-	GitCommitPtr commitPtr = GitItemCreator::create<GitCommit>(GIT_COMMIT);
-	if (commitPtr == nullptr){		
-		return false;
-	}
-
-	bool result = true;
-	const CommitStorage& stor = branch->commits();
-
+			
+	bool result = true;	
+	std::vector<git_oid> iDs;
 	while (git_revwalk_next(oid, walker->gitItem()) == 0)
 	{
 		git_commit* commit;
@@ -381,9 +388,13 @@ bool Repo::readBranchCommits(const BranchPtr branch)
 			result = false;
 			break;
 		}	
-		
-		commitPtr->setItem(commit);	
 
+		GitCommitPtr commitPtr = GitItemCreator::get().create<GitCommit>(GIT_COMMIT);
+		if (commitPtr == nullptr){
+			return false;
+		}
+		
+		commitPtr->setItem(commit);		
 		CommitPtr cPtr = std::make_shared<Commit>(commitPtr);
 		if (cPtr == nullptr)
 		{
@@ -392,7 +403,7 @@ bool Repo::readBranchCommits(const BranchPtr branch)
 		}
 
 		branch->addCommit(cPtr);
-	}
+	}	
 
 	if (!result){
 		branch->clearCommits();
@@ -408,7 +419,7 @@ void Repo::closeRepo()
 	mRemotes.clear();
 }
 
-bool Repo::getBranches(BranchStorage& branchStorage, bool getRemotes /*= false*/)
+bool Repo::getBranches(BranchStorage& branchStorage, const bool& getRemotes /*= false*/)
 {
 	if (!isValid())
 	{
@@ -455,6 +466,31 @@ bool Repo::getBranches(BranchStorage& branchStorage, bool getRemotes /*= false*/
 	return true;
 }
 
+BranchPtr Repo::getBranch(const string& refName)
+{
+	BranchPtr branch;
+
+	GitRefPtr refPtr = Aux::getReference(refName, mGitRepo);
+	if (refPtr != nullptr)
+	{
+		bool isRemote = false;
+		bool isLocal = git_reference_is_branch(refPtr->gitItem());
+		if (!isLocal){
+			isRemote = git_reference_is_remote(refPtr->gitItem());
+		}
+
+		if (isLocal || isRemote)
+		{
+			branch = std::make_shared<Branch>(refPtr, isRemote);
+			if (!readBranchCommits(branch)){
+				branch.reset();
+			}
+		}		
+	}
+	
+	return branch;
+}
+
 GitRepoPtr Repo::gitRepo() const
 {
 	return mGitRepo;
@@ -478,7 +514,7 @@ bool Repo::isValid() const
 
 GitStrArrPtr Aux::createStrArr()
 {
-	auto remoteList = GitItemCreator::create<GitStrArr>(GIT_STR_ARR);
+	auto remoteList = GitItemCreator::get().create<GitStrArr>(GIT_STR_ARR);
 	if (remoteList != nullptr)
 	{
 		remoteList->initItem();
@@ -521,7 +557,7 @@ GitRefPtr Aux::getReference(const string& refName, const GitRepoPtr repo)
 	git_reference* ref = nullptr;
 	if (git_reference_lookup(&ref, repo->gitItem(), refName.c_str()) == 0)
 	{
-		refPtr = GitItemCreator::create<GitRef>(GIT_REF);
+		refPtr = GitItemCreator::get().create<GitRef>(GIT_REF);
 		if (refPtr != nullptr){
 			refPtr->setItem(ref);
 		}
@@ -538,7 +574,7 @@ GitCommitPtr Aux::readCommit(const RepoPtr repo, const git_oid *head)
 	if (head != nullptr && 
 		git_commit_lookup(&gitCommit, repo->gitRepo()->gitItem(), head) == 0)
 	{
-		commit = GitItemCreator::create<GitCommit>(GIT_COMMIT);
+		commit = GitItemCreator::get().create<GitCommit>(GIT_COMMIT);
 		commit->setItem(gitCommit);		
 	}
 

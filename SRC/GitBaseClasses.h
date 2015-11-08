@@ -46,6 +46,7 @@ public:
 	git_time time() const;
 	string author() const;
 	string message() const;
+	git_oid id() const;
 	GitCommitPtr commit() const;
 
 	bool isValid() const;
@@ -110,9 +111,10 @@ public:
 	string path() const;
 	bool isValid() const;
 	GitRepoPtr gitRepo() const;
-	bool getBranches(BranchStorage& branchStor, bool getRemotes = false);
+	BranchPtr getBranch(const string& refName);
+	bool getBranches(BranchStorage& branchStor, const bool& getRemotes = false);	
 
-private:			
+private:	
 	bool readBranchCommits(const BranchPtr branch);
 	bool readRemotesList(RemotesList& remotesList);
 	bool updateRemotes(const git_fetch_options& fetch_opts);		

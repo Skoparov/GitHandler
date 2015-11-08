@@ -2,17 +2,18 @@
 #define GITHANDLER_H
 
 #include "GitBaseClasses.h"
+
 typedef std::map<string, RepoPtr> RepoStorage;
 
 //////////////////////////////////////////////////////////////////////////////
-///////////////				   GitHandler			    //////////////////////
+///////////////                GitHandler               //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
 class GitHandler
 {	
 	typedef std::weak_ptr<Repo> CurrentRepoPtr;
-	typedef std::multimap<string, BranchPtr> NewBranchStorage;
-	typedef std::multimap<string, std::pair<string, CommitPtr>> NewCommitStorage;
+	typedef std::map<string, vector<BranchPtr>> NewBranchStorage;
+	typedef std::map<std::pair<string, string>, vector<CommitPtr>> NewCommitStorage;
 
 public:
 	GitHandler();
@@ -23,9 +24,10 @@ public:
 	void clear();
 		
 	RepoPtr getRepo(const string& path) const;
-	const RepoStorage& getRepos() const;	
+	const RepoStorage& getRepos() const;
 
-	void printNew() const;
+	NewBranchStorage newBranches();
+	NewCommitStorage newCommits();	
 
 private:	
 	bool registerGitItemTypes();

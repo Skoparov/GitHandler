@@ -1,5 +1,5 @@
-#ifndef DELETERS_H
-#define DELETERS_H
+#ifndef GITDELETERS_H
+#define GITDELETERS_H
 
 #include "include/git2.h"
 
@@ -62,4 +62,4 @@ static void deleteRevWalk(git_revwalk* rv)
 	}
 }
 
-#endif
+#endif //GITDELETERS_H
