@@ -7,6 +7,7 @@
 GitHandler::CurrentRepoPtr GitHandler::mCurrentRepo;
 GitHandler::NewBranchStorage GitHandler::mNewBranches;
 GitHandler::NewCommitStorage GitHandler::mNewCommits;
+GitHandler::Credentials GitHandler::mCredentials;
 
 GitHandler::GitHandler()
 {
@@ -14,11 +15,12 @@ GitHandler::GitHandler()
 	registerGitItemTypes();
 }
 
-bool GitHandler::addRepo(const RepoPtr repo)
+bool GitHandler::addRepo(const RepoPtr repo, const string username, const string pass)
 {	
 	if (repo->isValid())
 	{
-		mRepos.insert(std::make_pair(repo->path(), repo));
+		mRepos.insert(make_pair(repo->path(), repo));
+		mCredentials.insert(make_pair(repo->path(), make_pair(username, pass)));
 		return true;
 	}
 
@@ -32,6 +34,7 @@ bool GitHandler::update()
 	git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
 	fetch_opts.callbacks.update_tips = &update_cb;
 	fetch_opts.callbacks.sideband_progress = &progress_cb;
+	fetch_opts.callbacks.credentials = &cred_acquire_cb;
 
 	for (auto repo : mRepos)
 	{
@@ -137,6 +140,25 @@ int GitHandler::update_cb(const char *refname, const git_oid *oldHead, const git
 	}
 	
 	return 0;
+}
+
+int GitHandler::cred_acquire_cb(git_cred **out, const char* url, const char* username_from_url, unsigned int allowed_typed, void* data)
+{	
+	int res = 1;
+	if (mCurrentRepo.expired()){
+		return res;
+	}
+
+	RepoPtr currRepo = mCurrentRepo.lock();
+	auto credentials = mCredentials.find(currRepo->path());	
+	if (credentials != mCredentials.end())
+	{		
+		res = git_cred_userpass_plaintext_new(out, credentials->second.first.c_str(), credentials->second.second.c_str());
+		//int res = git_cred_ssh_key_new(out, "git", "C:\\Users\\Sergey\\\.ssh\\id_rsa.pub", "C:\\Users\\Sergey\\\.ssh\\id_rsa", "221289");	
+	}	
+
+	printf("checking key: %d\n", res);
+	return res;
 }
 
 bool GitHandler::registerGitItemTypes()

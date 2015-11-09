@@ -25,16 +25,18 @@ void printNew(GitHandler& h)
 int main(int argc, char *argv[])
 {			
 	GitHandler h;
-	string path = "D:\\Test";
+
+	string path = "D:\\Repo\\privatetestrepo";
 	//string path = "D:\\Repo\\libgit2";	
 
 			
 	RepoPtr repo = std::make_shared<Repo>();
 	bool result = repo->openLocal(path);
-	h.addRepo(repo);
+	h.addRepo(repo, "Skoparov", "Q3e5T7u9");
 	
-	h.update();	
-	printNew(h);
+	bool a = h.update();
+	printf("Fetch %s\n", a ? "successful" : "failed");
+	printNew(h);		
 
 	/*auto repoPtr = h.getRepo(path);
 	if (repoPtr != nullptr)

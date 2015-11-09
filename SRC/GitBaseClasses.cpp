@@ -247,7 +247,7 @@ bool Repo::updateRemotes(const git_fetch_options& fetch_opts)
 			if (git_remote_lookup(&remote, mGitRepo->gitItem(), name.c_str()) != 0){				
 				return false;
 			}
-		
+			
 			GitRemotePtr remotePtr = GitItemCreator::get().create<GitRemote>(GIT_REMOTE);
 			if (remotePtr == nullptr)
 			{				
@@ -255,10 +255,10 @@ bool Repo::updateRemotes(const git_fetch_options& fetch_opts)
 				return false;
 			}
 
+			string url = git_remote_url(remote);
+			string name = git_remote_name(remote);
+			printf("Fetching from %s: %s\n", name.c_str(), url.c_str());
 			remotePtr->setItem(remote);
-			if (git_remote_connect(remotePtr->gitItem(), GIT_DIRECTION_FETCH, &fetch_opts.callbacks, NULL) != 0){				
-				return false;
-			}			
 
 			mRemotes.insert(std::make_pair(name, remotePtr));		
 		}		
@@ -453,8 +453,8 @@ BranchPtr Repo::getBranch(const string& refName)
 	GitRefPtr refPtr = Aux::getReference(refName, mGitRepo);
 	if (refPtr != nullptr)
 	{
-		bool isRemote = false;
-		bool isLocal = git_reference_is_branch(refPtr->gitItem());
+		int isRemote = false;
+		int isLocal = git_reference_is_branch(refPtr->gitItem());
 
 		if (!isLocal){
 			isRemote = git_reference_is_remote(refPtr->gitItem());
