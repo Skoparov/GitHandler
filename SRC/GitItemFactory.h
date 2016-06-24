@@ -11,7 +11,7 @@
 class GitItemFactoryInterface
 {	
 public:
-	virtual ~GitItemFactoryInterface(){};
+    virtual ~GitItemFactoryInterface(){}
 	virtual ItemPtr create() = 0;	
 };
 

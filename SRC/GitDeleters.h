@@ -1,7 +1,7 @@
 #ifndef GITDELETERS_H
 #define GITDELETERS_H
 
-#include "include/git2.h"
+#include "git2.h"
 
 static void deleteRepo(git_repository* repo)
 {

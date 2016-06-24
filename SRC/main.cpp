@@ -1,4 +1,4 @@
-#include "githandler.h"
+#include "GitHandler.h"
 #include <iostream>
 
 void printNew(GitHandler& h)
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 {			
 	GitHandler h;
 
-	string path = "D:\\Repo\\privatetestrepo";
+    string path = "/home/skoparov/Repo/dir";
 	//string path = "D:\\Repo\\libgit2";	
 
 			
@@ -35,10 +35,10 @@ int main(int argc, char *argv[])
 	h.addRepo(repo, "Skoparov", "Q3e5T7u9");
 	
 	bool a = h.update();
-	printf("Fetch %s\n", a ? "successful" : "failed");
-	printNew(h);		
+    printf("Fetch %s\n", a ? "successful" : "failed");
+    printNew(h);
 
-	/*auto repoPtr = h.getRepo(path);
+    auto repoPtr = h.getRepo(path);
 	if (repoPtr != nullptr)
 	{
 		BranchStorage locals;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 				Aux::printBranchCommits(branch.second);
 			}
 		}
-	}*/
+    }
 	
 	std::cin.get();
 }

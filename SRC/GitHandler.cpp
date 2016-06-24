@@ -128,7 +128,10 @@ int GitHandler::update_cb(const char *refname, const git_oid *oldHead, const git
 		const CommitStorage& commits = branch->commits();
 		auto oldHeadCommit = std::find_if(commits.begin(), commits.end(),
 			                              [oldHead](CommitStorage::value_type commit)->bool
-		                                  {return git_oid_equal(oldHead, &commit.second->id());});
+                                          {
+                                            const auto& id = commit.second->id();
+                                            return git_oid_equal(oldHead, &id);
+                                          });
 
 		if (oldHeadCommit != commits.end()){
 			oldHeadCommit++;
