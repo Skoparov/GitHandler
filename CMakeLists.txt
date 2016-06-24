@@ -22,7 +22,6 @@ find_package(Boost 1.55.0 REQUIRED system thread date_time unit_test_framework)
 if(NOT Boost_FOUND)
 	message(FATAL_ERROR "Cannot find boost")
 else()
-  	message(STATUS "Setting up BOOST")
 	message(STATUS "Boost includes : " ${Boost_INCLUDE_DIRS})
 	message(STATUS "Boost libs : " ${Boost_LIBRARY_DIRS})
 endif(NOT Boost_FOUND)			
@@ -32,36 +31,35 @@ endif(NOT Boost_FOUND)
 ################################
 
 include(ExternalProject)
+set(LIBGIT2_NAME libgit2)
 
 # Download and install LibGit2
 ExternalProject_Add(
-	git2
+	${LIBGIT2_NAME}
 	GIT_REPOSITORY https://github.com/libgit2/libgit2.git
-	PREFIX ${CMAKE_CURRENT_BINARY_DIR}/libgit2
-	#INSTALL_DIR ${PROJECT_SOURCE_DIR}/libgit2	
+	PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${LIBGIT2_NAME}
+	#INSTALL_DIR ${PROJECT_SOURCE_DIR}/${LIBGIT2_NAME}	
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>)
 
-if (WIN32)
-	message(STATUS "WIN32")
-	set(LIBGIT2_NAME libgit2.dll)
-elseif(UNIX)    
-	message(STATUS "UNIX")
-	set(LIBGIT2_NAME libgit2.so)
-else()
-	message(FATAL_ERROR "Cannot determine OS type")	
-endif (WIN32)
-
-ExternalProject_Get_Property(git2 install_dir)
-message(STATUS "INSTALL_DIR")
-message(STATUS ${install_dir})
+ExternalProject_Get_Property(${LIBGIT2_NAME} install_dir)
 
 set(LIBGIT2_LIBRARY_DIRS ${install_dir}/lib)
 set(LIBGIT2_INCLUDE_DIRS ${install_dir}/include)
-set(LIBGIT2_LIB ${LIBGIT2_LIBRARY_DIRS}/${LIBGIT2_NAME})
+set(LIBGIT2_LIB git2)
+
+################################
+# Project Names
+################################
+
+set(GIT_HANDLER_PROJECT_NAME GitHandler)
+set(GIT_HANDLER_TESTS_PROJECT_NAME GitHandlerTests)
 
 ################################
 # Includes and links
 ################################
+link_directories( ${LIBGIT2_LIBRARY_DIRS} 
+				  ${Boost_LIBRARY_DIRS} 
+				  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${LIBGIT2_INCLUDE_DIRS})
@@ -72,3 +70,4 @@ include_directories("./Test")
 include_directories(${CMAKE_BINARY_DIR})
 
 add_subdirectory(SRC)
+add_subdirectory(Test)
