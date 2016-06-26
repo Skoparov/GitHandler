@@ -2,145 +2,139 @@
 #define GITBASECLASSES_H
 
 #include <set>
-
-#include <boost/format.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/date_time/gregorian/gregorian_types.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <string>
 
 #include "GitItemFactory.h"
 
-using std::vector;
-using std::string;
+namespace git_handler
+{
 
-class Commit;
-class Branch;
+namespace base
+{
+
+// Item aliases
+using GitRef     = item::GitItem< git_reference >;
+using GitRepo    = item::GitItem< git_repository >;
+using GitRemote  = item::GitItem< git_remote >;
+using GitCommit  = item::GitItem< git_commit >;
+using GitStrArr  = item::GitItem< git_strarray >;
+using GitRevWalk = item::GitItem< git_revwalk >;
+
 class Repo;
-class Aux;
-
-typedef std::shared_ptr<Commit>    CommitPtr;
-typedef std::shared_ptr<Branch>    BranchPtr;
-typedef std::shared_ptr<Repo>      RepoPtr;
-typedef std::weak_ptr<Repo>        ParentRepoPtr;
-
-typedef std::pair<git_time_t, std::string> CommitId;
-typedef std::map<CommitId, CommitPtr> CommitStorage;
-typedef std::map<string, BranchPtr> BranchStorage;
-typedef std::set<string> RemotesList;
-
-using namespace boost::posix_time;
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////                 Commit                  //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-class Commit
+class Commit : public std::enable_shared_from_this< Commit >
 {
 public:
-	Commit(const GitCommitPtr commit = nullptr);
+    explicit Commit( std::unique_ptr< GitCommit >&& commit = nullptr );
 
-	Commit(const Commit& other);
-	Commit& operator=(const Commit& other);	
-
-	git_time time() const;
-	string author() const;
-	string message() const;
-	git_oid id() const;
-	GitCommitPtr commit() const;
-
-	bool isValid() const;
+    git_oid id() const noexcept;
+    git_time time() const noexcept;
+    std::string author() const noexcept;
+    std::string message() const noexcept;
+    bool isValid() const noexcept;
 
 private:	
-	GitCommitPtr mCommit;
+    std::unique_ptr< GitCommit > mCommit;
 };
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////                Branch                   //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-class Branch
+class Branch : public std::enable_shared_from_this< Branch >
+{
+    friend class Repo;
+
+public:
+    using CommitId      = std::pair< git_time_t, std::string >;
+    using CommitStorage = std::map< CommitId, std::unique_ptr< Commit > >;
+
+public:
+    Branch( std::unique_ptr< GitRef >&& branchRef = nullptr,
+            const bool isRemote = false,
+            const std::shared_ptr< Repo > parentRepo = nullptr );
+
+    void addCommit( std::unique_ptr< Commit >&& commit );
+    void clearCommits() noexcept;
+	
+    std::string name() const noexcept;
+    const CommitStorage& commits() const noexcept;
+
+    bool isRemote() const noexcept;
+    bool isValid() const noexcept;
+	
+private:
+    CommitStorage mCommits;
+    std::unique_ptr< GitRef > mBranchRef;
+    bool mIsRemote;
+    std::weak_ptr< Repo > mParentRepo;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/////////////////                   Repo                  //////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+class Repo : public std::enable_shared_from_this< Repo >
 {
 public:
-	Branch(const GitRefPtr branchRef = nullptr,
-		   const bool& isRemote = false,
-		   const RepoPtr parentRepo = nullptr);
+    using BranchStorage = std::map< std::string, std::unique_ptr< Branch > >;
+    using Remotes = std::map< std::string, std::unique_ptr< GitRemote > >;
 
-	Branch(const Branch& other);
-	Branch& operator=(const Branch& other);
-
-	void addCommit(const CommitPtr commit);	
-	void clearCommits();
-	
-	string name() const;
-	GitRefPtr ref() const;
-	const CommitStorage& commits() const;	
-
-	bool isRemote() const;
-	bool isValid() const;
-	
-private:	
-	CommitStorage mCommits;
-	ParentRepoPtr mParentRepo;
-	GitRefPtr mBranchRef;
-	bool mIsRemote;
-};
-
-//////////////////////////////////////////////////////////////////////////////
-///////////////                   Repo                  //////////////////////
-//////////////////////////////////////////////////////////////////////////////
-
-class Repo
-{	
-	typedef std::map<string, GitRemotePtr> Remotes;
+private:
+    using RemotesList   = std::set< std::string >;
 
 public:
-	Repo(const string& repoPath = string(),
-		 const GitRepoPtr repo = nullptr);
-
-	Repo(const Repo& other);
-	Repo& operator=(const Repo& other);
+    Repo( const std::string& repoPath = {},
+          std::unique_ptr< GitRepo >&& repo = nullptr );
 	
-	// repo operations
-	bool openLocal(const string& path);
-	bool fetch(const git_fetch_options& fetch_opts);
-	bool clone(const string& url, const string& path, const git_clone_options& cloneOpts);
-	void closeRepo();	
+    // repo operations
+    bool openLocal( const std::string& path );
+    bool fetch( const git_fetch_options& fetch_opts );
+    bool clone( const std::string& url, const std::string& path, const git_clone_options& cloneOpts );
+    void closeRepo() noexcept;
 
-	// getters		
-	string path() const;
-	bool isValid() const;
-	GitRepoPtr gitRepo() const;
-	BranchPtr getBranch(const string& refName);
-	bool getBranches(BranchStorage& branchStor, const bool& getRemotes = false);	
+    // getters
+    bool isValid() const noexcept;
+    std::string path() const noexcept;
+    std::unique_ptr< Branch > getBranch( const std::string& refName );
+    bool getBranches( BranchStorage& branchStor, const bool getRemotes = false );
 
-private:	
-	bool readBranchCommits(const BranchPtr branch);
-	bool readRemotesList(RemotesList& remotesList);
-	bool updateRemotes(const git_fetch_options& fetch_opts);		
+private:
+    bool readRemotesList( RemotesList& remotesList );
+    bool readBranchCommits( Branch* branch);
+    bool updateRemotes(const git_fetch_options& fetch_opts);
 
-private:		
-	GitRepoPtr mGitRepo;	
-	Remotes mRemotes;
-	string mLocalPath;
+private:
+    std::string mLocalPath;
+    std::unique_ptr< GitRepo > mGitRepo;
+    Remotes mRemotes;
 };
 
-//////////////////////////////////////////////////////////////////////////////
-///////////////                   Aux                   //////////////////////
-//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+/////////////////                   Aux                   //////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 class Aux
 {
-public:	
-	static GitStrArrPtr createStrArr();
-	static string getCommitMessageStr(CommitPtr commit);	
-	static GitRefPtr getReference(const string& refName, const GitRepoPtr repo);
-	static GitCommitPtr readCommit(const RepoPtr repo, const git_oid *head);	
-	static GitStrArrPtr getRepoRefList(const GitRepoPtr repo);	
-	static string getBranchName(const string& fullBranchName);
+public:
+    static std::unique_ptr< GitStrArr > createStrArr();
+    static std::string                  getCommitMessageStr( const Commit* commit );
+    static std::unique_ptr< GitRef >    getReference( const std::string& refName, const GitRepo* repo );
+    static std::unique_ptr< GitCommit > readCommit(const GitRepo* repo, const git_oid* head );
+    static std::unique_ptr< GitStrArr > getRepoRefList( const GitRepo* repo );
+    static std::string                  getBranchName( const std::string& fullBranchName );
 
-	static void printBranches(const BranchStorage& storage);
-	static void printCommit(const  CommitPtr commit);
-	static void printBranchCommits(const BranchPtr branch);
+    static void printBranches( const Repo::BranchStorage& storage );
+    static void printCommit( const Commit* commit );
+    static void printBranchCommits( const Branch* branch );
 };
+
+}//base
+
+}//git_handler
 
 #endif // GITBASECLASSES_H

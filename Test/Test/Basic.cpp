@@ -23,7 +23,7 @@
 // }
 
 TEST( GitHandlerTest, Basic )
-{
+{    
     // GitHandler h;
 
     // string path = "/home/skoparov/Repo/dir";

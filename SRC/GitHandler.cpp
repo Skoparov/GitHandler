@@ -1,187 +1,201 @@
 #include "GitHandler.h"
+#include "GitItem.cpp"
 
-//////////////////////////////////////////////////////////////////////////////
-///////////////                GitHandler               //////////////////////
-//////////////////////////////////////////////////////////////////////////////
+namespace git_handler
+{
 
-GitHandler::CurrentRepoPtr GitHandler::mCurrentRepo;
+////////////////////////////////////////////////////////////////////////////////
+/////////////////                GitHandler               //////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+//GitHandler::CurrentRepoPtr GitHandler::mCurrentRepo;
 GitHandler::NewBranchStorage GitHandler::mNewBranches;
 GitHandler::NewCommitStorage GitHandler::mNewCommits;
 GitHandler::Credentials GitHandler::mCredentials;
 
 GitHandler::GitHandler()
 {
-	git_libgit2_init();	
-	registerGitItemTypes();
+    git_libgit2_init();
+    registerGitItemTypes();
 }
 
-bool GitHandler::addRepo(const RepoPtr repo, const string username, const string pass)
-{	
-	if (repo->isValid())
-	{
-		mRepos.insert(make_pair(repo->path(), repo));
-		mCredentials.insert(make_pair(repo->path(), make_pair(username, pass)));
-		return true;
-	}
-
-	return false;
-}
-
-bool GitHandler::update()
+bool GitHandler::addRepo( std::unique_ptr< base::Repo >&& repo, const std::string& username, const std::string& pass)
 {
-	bool result = true;
+    if ( repo->isValid() )
+    {
+        mRepos.emplace( repo->path(), std::move( repo )  );
+        mCredentials.emplace( repo->path(), std::make_pair( username, pass ) );
+        return true;
+    }
 
-	git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
-	fetch_opts.callbacks.update_tips = &update_cb;
-	fetch_opts.callbacks.sideband_progress = &progress_cb;
-	fetch_opts.callbacks.credentials = &cred_acquire_cb;
-
-	for (auto repo : mRepos)
-	{
-		mCurrentRepo = repo.second;
-		result &= repo.second->fetch(fetch_opts);
-	}
-
-	return result;
+    return false;
 }
 
-void GitHandler::clear()
+bool GitHandler::update() noexcept
 {
-	mRepos.clear();
-	mNewBranches.clear();
-	mNewCommits.clear();
+    bool result = true;
+
+    git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
+    fetch_opts.callbacks.update_tips = &update_cb;
+    fetch_opts.callbacks.sideband_progress = &progress_cb;
+    fetch_opts.callbacks.credentials = &cred_acquire_cb;
+
+    for ( auto& repo : mRepos )
+    {
+        result &= repo.second->fetch( fetch_opts );
+    }
+
+    return result;
 }
 
-RepoPtr GitHandler::getRepo(const string& path) const
-{	
-	auto repoIter = mRepos.find(path);
-	if(repoIter != mRepos.end()){
-		return repoIter->second;
-	}
-
-	return nullptr;
-}
-
-const RepoStorage& GitHandler::getRepos() const
+void GitHandler::clear() noexcept
 {
-	return mRepos;
+    mRepos.clear();
+    mNewBranches.clear();
+    mNewCommits.clear();
 }
 
-auto GitHandler::newBranches()->NewBranchStorage
+base::Repo* GitHandler::getRepo( const std::string& path ) const noexcept
 {
-	return NewBranchStorage(std::move(mNewBranches));
+    auto repoIter = mRepos.find( path );
+    if( repoIter != mRepos.end() )
+    {
+        return repoIter->second.get();
+    }
+
+    return nullptr;
 }
 
-auto GitHandler::newCommits()->NewCommitStorage
+auto GitHandler::getRepos() const noexcept -> const RepoStorage&
 {
-	return NewCommitStorage(std::move(mNewCommits));
+    return mRepos;
 }
 
-int GitHandler::progress_cb(const char *str, int len, void *data)
+//auto GitHandler::newBranches() -> NewBranchStorage
+//{
+//    return NewBranchStorage( std::move(mNewBranches) );
+//}
+
+//auto GitHandler::newCommits() -> NewCommitStorage
+//{
+//    return NewCommitStorage( std::move( mNewCommits ) );
+//}
+
+int GitHandler::progress_cb( const char *str, int len, void *data )
 {
-	//printf("remote: %.*s", len, str);
-	//fflush(stdout); /* We don't have the \n to force the flush */
-	return 0;
+    //printf("remote: %.*s", len, str);
+    //fflush(stdout); /* We don't have the \n to force the flush */
+    return 0;
 }
 
 int GitHandler::update_cb(const char *refname, const git_oid *oldHead, const git_oid *head, void *data)
 {
-	if (mCurrentRepo.expired()){
-		return 1;
-	}
+//    if ( !mCurrentRepo )
+//    {
+//        return 1;
+//    }
 
-	RepoPtr currRepo = mCurrentRepo.lock();
+//    if ( git_oid_iszero( oldHead ) ) // new branch
+//    {
+//        auto ref = base::Aux::getReference( refname, currRepo->get() );
+//        if ( !ref )
+//        {
+//            return 1;
+//        }
 
-	if (git_oid_iszero(oldHead)) // new branch
-	{
-		GitRefPtr ref = Aux::getReference(refname, currRepo->gitRepo());
-		if (ref == nullptr){
-			return 1;
-		}
+//        auto branchPtr = std::make_unique< Branch >( ref, true );
 
-		BranchPtr branchPtr = std::make_shared<Branch>(ref, true);
+//        auto branchStor = mNewBranches.find( currRepo->path() );
+//        if ( branchStor == mNewBranches.end() )
+//        {
+//            mNewBranches.emplace( currRepo->path(), std::vector< base::Branch* >() );
+//            branchStor = mNewBranches.find( currRepo->path() );
+//        }
 
-		auto branchStor = mNewBranches.find(currRepo->path());
-		if (branchStor == mNewBranches.end())
-		{
-			mNewBranches.insert(std::make_pair(currRepo->path(), vector<BranchPtr>()));
-			branchStor = mNewBranches.find(currRepo->path());
-		}
+//        branchStor->second.push_back( branchPtr );
+//    }
+//    else //new commit
+//    {
+//        auto key = std::make_pair(currRepo->path(), refname);
+//        auto storage = mNewCommits.find(key);
+//        if (storage == mNewCommits.end())
+//        {
+//            mNewCommits.insert(std::make_pair(key, vector<CommitPtr>()));
+//            storage = mNewCommits.find(key);
+//        }
 
-		branchStor->second.push_back(branchPtr);
-	}
-	else //new commit
-	{				
-		auto key = std::make_pair(currRepo->path(), refname);
-		auto storage = mNewCommits.find(key);
-		if (storage == mNewCommits.end())
-		{
-			mNewCommits.insert(std::make_pair(key, vector<CommitPtr>()));
-			storage = mNewCommits.find(key);
-		}
+//        auto branch = currRepo->getBranch(refname);
+//        if (branch == nullptr){
+//            return 1;
+//        }
 
-		auto branch = currRepo->getBranch(refname);
-		if (branch == nullptr){
-			return 1;
-		}
+//        const CommitStorage& commits = branch->commits();
+//        auto oldHeadCommit = std::find_if(commits.begin(), commits.end(),
+//                                          [oldHead](CommitStorage::value_type commit)->bool
+//                                          {
+//                                            const auto& id = commit.second->id();
+//                                            return git_oid_equal(oldHead, &id);
+//                                          });
 
-		const CommitStorage& commits = branch->commits();
-		auto oldHeadCommit = std::find_if(commits.begin(), commits.end(),
-			                              [oldHead](CommitStorage::value_type commit)->bool
-                                          {
-                                            const auto& id = commit.second->id();
-                                            return git_oid_equal(oldHead, &id);
-                                          });
-
-		if (oldHeadCommit != commits.end()){
-			oldHeadCommit++;
-		}
+//        if (oldHeadCommit != commits.end()){
+//            oldHeadCommit++;
+//        }
 			
-		for (auto commitIt = oldHeadCommit; commitIt != commits.end(); ++commitIt){									
-			storage->second.push_back(commitIt->second);
-		}		
-	}
+//        for (auto commitIt = oldHeadCommit; commitIt != commits.end(); ++commitIt){
+//            storage->second.push_back(commitIt->second);
+//        }
+//    }
 	
-	return 0;
+    return 0;
 }
 
-int GitHandler::cred_acquire_cb(git_cred **out, const char* url, const char* username_from_url, unsigned int allowed_typed, void* data)
-{	
-	int res = 1;
-	if (mCurrentRepo.expired()){
-		return res;
-	}
+int GitHandler::cred_acquire_cb( git_cred **out, const char* url, const char* username_from_url, unsigned int allowed_typed, void* data )
+{
+    int res = 1;
 
-	RepoPtr currRepo = mCurrentRepo.lock();
-	auto credentials = mCredentials.find(currRepo->path());	
-	if (credentials != mCredentials.end())
-	{		
-		res = git_cred_userpass_plaintext_new(out, credentials->second.first.c_str(), credentials->second.second.c_str());
-		//int res = git_cred_ssh_key_new(out, "git", "C:\\Users\\Sergey\\\.ssh\\id_rsa.pub", "C:\\Users\\Sergey\\\.ssh\\id_rsa", "221289");	
-	}	
+    if ( !mCurrentRepo )
+    {
+        return res;
+    }
 
-	printf("checking key: %d\n", res);
-	return res;
+    const auto& credentials = mCredentials.find( mCurrentRepo->path() );
+    if (credentials != mCredentials.end())
+    {
+        res = git_cred_userpass_plaintext_new( out, credentials->second.first.c_str(), credentials->second.second.c_str() );
+        //int res = git_cred_ssh_key_new(out, "git", "C:\\Users\\Sergey\\\.ssh\\id_rsa.pub", "C:\\Users\\Sergey\\\.ssh\\id_rsa", "221289");
+    }
+
+    printf("checking key: %d\n", res);
+    return res;
+}
+
+template< class GitItemType >
+std::unique_ptr< factory::GitItemFactoryIf > createFactory()
+{
+    return std::make_unique< factory::GitItemFactory< GitItemType > >();
 }
 
 bool GitHandler::registerGitItemTypes()
 {
-	bool ok = true;
+    bool ok = true;
 	
-	auto& c = GitItemCreator::get();
+    auto& c = factory::GitItemCreator::get();
 
-	ok &= c.registerItemType <git_repository, void(*)(git_repository*)> (GIT_REPO,     &deleteRepo);
-	ok &= c.registerItemType <git_remote,     void(*)(git_remote*)>     (GIT_REMOTE,   &deleteRemote);
-	ok &= c.registerItemType <git_commit,     void(*)(git_commit*)>     (GIT_COMMIT,   &deleteCommit);
-	ok &= c.registerItemType <git_reference,  void(*)(git_reference*)>  (GIT_REF,      &deleteRef);
-	ok &= c.registerItemType <git_strarray,   void(*)(git_strarray*)>   (GIT_STR_ARR,  &deleteStrArr);
-	ok &= c.registerItemType <git_revwalk,    void(*)(git_revwalk*)>    (GIT_REV_WALK, &deleteRevWalk);
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REPO,     std::move( createFactory< git_repository >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REMOTE,   std::move( createFactory< git_remote >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_COMMIT,   std::move( createFactory< git_commit >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REF,      std::move( createFactory< git_reference >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_STR_ARR,  std::move( createFactory< git_strarray >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REV_WALK, std::move( createFactory< git_repository >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REPO,     std::move( createFactory< git_revwalk >() ) );
 
-	return ok;
+    return ok;
 }
 
 GitHandler::~GitHandler()
 {
-	clear();
-	git_libgit2_shutdown();
+    clear();
+    git_libgit2_shutdown();
 }
+
+} //git_handler

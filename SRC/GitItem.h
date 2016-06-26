@@ -4,74 +4,42 @@
 #include "memory"
 #include "GitDeleters.h"
 
-enum GitItemType
+namespace details
 {
-	GIT_REPO,
-	GIT_REMOTE,
-	GIT_COMMIT,
-	GIT_REF,
-	GIT_STR_ARR,
-	GIT_REV_WALK
-};
 
-class Item;
-typedef std::shared_ptr<Item> ItemPtr;
+// helper alias to conveniently determine unique_ptr base for GitItem
+template< class T >
+using UniquePtrBase = std::unique_ptr< T, TypeDeleter< T > >;
 
-//////////////////////////////////////////////////////////////////////////////
-///////////////                  GitItem                //////////////////////
-//////////////////////////////////////////////////////////////////////////////
+} //details
 
+namespace git_handler
+{
+
+namespace item
+{
+
+// Base item class
 class Item
 {
-public: 
-	virtual ~Item() {}; 
+public:
+    virtual ~Item() = default;
 };
 
-template<class GitItemType, class Deleter>
-class GitItem : public Item
-{
-	typedef std::shared_ptr<GitItemType> ItemPtr;
+template< class LibGitItemType >
+class GitItem : public Item, public details::UniquePtrBase< LibGitItemType >
+{    
+    using details::UniquePtrBase< LibGitItemType >::unique_ptr;
 
 public:
-	GitItem(Deleter del) : mDeleter(del) {}
-
-	void initItem(){
-		mItem = ItemPtr(new GitItemType, mDeleter);
-	}
-
-	ItemPtr item() {
-		return mItem;
-	};
-
-	GitItemType* gitItem(){
-		return mItem.get();
-	}	
-
-	void setItem(GitItemType* item){		
-		mItem.reset(item, mDeleter);	
-	}
-	
-	bool isValid(){
-		return mItem != nullptr; 
-	}	
-
-private:
-	std::shared_ptr<GitItemType> mItem;
-	Deleter mDeleter;
+    using _internalType = LibGitItemType;
 };
 
-typedef GitItem<git_repository, void(*)(git_repository*)> GitRepo;
-typedef GitItem<git_remote,     void(*)(git_remote*)>     GitRemote;
-typedef GitItem<git_commit,     void(*)(git_commit*)>     GitCommit;
-typedef GitItem<git_reference,  void(*)(git_reference*)>  GitRef;
-typedef GitItem<git_strarray,   void(*)(git_strarray*)>   GitStrArr;
-typedef GitItem<git_revwalk,    void(*)(git_revwalk*)>    GitRevWalk;
+// Item types
+enum class Type;
 
-typedef std::shared_ptr<GitRepo>    GitRepoPtr;
-typedef std::shared_ptr<GitRemote>  GitRemotePtr;
-typedef std::shared_ptr<GitCommit>  GitCommitPtr;
-typedef std::shared_ptr<GitRef>     GitRefPtr;
-typedef std::shared_ptr<GitStrArr>  GitStrArrPtr;
-typedef std::shared_ptr<GitRevWalk> GitRevWalkPtr;
+} //item
+
+}//git_handler
 
 #endif

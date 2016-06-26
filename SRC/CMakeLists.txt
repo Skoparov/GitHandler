@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-add_definitions("-std=c++11")
+add_definitions("-std=c++14")
 
 project (${GIT_HANDLER_PROJECT_NAME})
 message(STATUS ${PROJECT_NAME})
@@ -8,12 +8,15 @@ message(STATUS ${PROJECT_NAME})
 set (HEADERS 	GitDeleters.h	
                 GitItem.h
                 GitItemFactory.h 						
-				GitBaseClasses.h
+                GitBaseClasses.h
                 GitHandler.h
+                details/UniquePointerCast.h
 )		
 				
 set (SOURCES 	GitBaseClasses.cpp 
                 GitHandler.cpp
+                GitItem.cpp
+                GitDeleters.cpp
 )
 
 #Create shared lib
