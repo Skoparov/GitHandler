@@ -44,11 +44,11 @@ public:
 };
 
 // type checkers
-template< typename T, typename = void >
+template< typename T, typename = void, typename = void >
 struct is_git_item : std::false_type{};
 
 template< typename T >
-struct is_git_item< T, details::tag_checker_t< T > > : std::true_type{};
+struct is_git_item< T, details::tag_checker_t< T >, std::enable_if_t< std::is_base_of< Item, T >::value > > : std::true_type{};
 
 // Item types
 enum class Type;
