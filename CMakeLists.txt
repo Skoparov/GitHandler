@@ -17,7 +17,7 @@ set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/LIB/${CMAKE_BUILD_TYPE
 # Boost
 ################################
 
-find_package(Boost 1.55.0 REQUIRED system thread date_time unit_test_framework)
+find_package(Boost 1.55.0 REQUIRED system filesystem thread date_time)
 
 if(NOT Boost_FOUND)
 	message(FATAL_ERROR "Cannot find boost")

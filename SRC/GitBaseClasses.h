@@ -93,8 +93,8 @@ public:
 	
     // repo operations
     bool openLocal( const std::string& path );
-    bool fetch( const git_fetch_options& fetch_opts );
-    bool clone( const std::string& url, const std::string& path, const git_clone_options& cloneOpts );
+    bool fetch( const git_fetch_options& fetch_opts = GIT_FETCH_OPTIONS_INIT );
+    bool clone( const std::string& url, const std::string& path, const git_clone_options& cloneOpts = GIT_CLONE_OPTIONS_INIT );
     void closeRepo() noexcept;
 
     // getters

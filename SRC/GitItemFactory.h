@@ -2,6 +2,7 @@
 #define GITITEMFACTORY_H
 
 #include <map>
+#include <mutex>
 
 #include "GitItem.h"
 #include "details/UniquePointerCast.h"
@@ -65,6 +66,8 @@ public:
     template < class LibGitItemType >
     bool registerItemType( const item::Type itemType, std::unique_ptr< GitItemFactoryIf >&& factory )
     {
+        std::lock_guard< std::mutex > g( mMutex );
+
         if ( !mFactories.count( itemType ) )
         {
             mFactories.emplace( itemType, std::move( factory ) );
@@ -74,9 +77,11 @@ public:
         return false;
     }
 
-    template< class GitItemType >
+    template< class GitItemType, typename = std::enable_if_t< item::is_git_item< GitItemType >::value > >
     std::unique_ptr< GitItemType > create( const item::Type itemType, typename GitItemType::_internalType* manage = nullptr )
     {
+        std::lock_guard< std::mutex > g( mMutex );
+
         auto factory = mFactories.find( itemType );
 
         if ( factory != mFactories.end() )
@@ -97,6 +102,7 @@ public:
 
 private:
     FactoryStorage mFactories;
+    std::mutex mMutex;
 };
 
 }// factory
