@@ -182,12 +182,12 @@ bool GitHandler::registerGitItemTypes()
     auto& c = factory::GitItemCreator::get();
 
     ok &= c.registerItemType < git_repository > ( item::Type::GIT_REPO,     std::move( createFactory< git_repository >() ) );
-//    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REMOTE,   std::move( createFactory< git_remote >() ) );
-//    ok &= c.registerItemType < git_repository > ( item::Type::GIT_COMMIT,   std::move( createFactory< git_commit >() ) );
-//    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REF,      std::move( createFactory< git_reference >() ) );
-//    ok &= c.registerItemType < git_repository > ( item::Type::GIT_STR_ARR,  std::move( createFactory< git_strarray >() ) );
-//    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REV_WALK, std::move( createFactory< git_repository >() ) );
-//    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REPO,     std::move( createFactory< git_revwalk >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REMOTE,   std::move( createFactory< git_remote >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_COMMIT,   std::move( createFactory< git_commit >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REF,      std::move( createFactory< git_reference >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_STR_ARR,  std::move( createFactory< git_strarray >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REV_WALK, std::move( createFactory< git_repository >() ) );
+    ok &= c.registerItemType < git_repository > ( item::Type::GIT_REPO,     std::move( createFactory< git_revwalk >() ) );
 
     return ok;
 }
