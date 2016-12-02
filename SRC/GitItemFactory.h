@@ -14,17 +14,17 @@ namespace factory
 {
 
 // Generalized factory return value
-using ItemPtr = std::unique_ptr< item::Item >;
+using item_ptr = std::unique_ptr< item::item >;
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////           GitItemFactoryInterface       //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-class GitItemFactoryIf
+class igit_item_factory
 {
 public:
-    virtual ~GitItemFactoryIf() = default;
-    virtual ItemPtr create() const = 0;
+    virtual ~igit_item_factory() = default;
+    virtual item_ptr create() const = 0;
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -32,45 +32,47 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 template < class LibGitItemType >
-class GitItemFactory : public GitItemFactoryIf
+class git_item_factory : public igit_item_factory
 {
-    using Deleter = details::TypeDeleter< LibGitItemType >;
-    using CurrItem = item::GitItem< LibGitItemType >;
+    using deleter = details::type_deleter< LibGitItemType >;
+    using curr_item = item::git_item< LibGitItemType >;
 
 public:
-    ItemPtr create() const override
+    item_ptr create() const override
     {
-        LibGitItemType* item = nullptr;
-        return std::make_unique< CurrItem >( item, mDeleter );
+        LibGitItemType* item{ nullptr };
+        return std::make_unique< curr_item >( item, m_deleter );
     }
 
 private:
-    Deleter mDeleter{ deleters::deleteItem< LibGitItemType > };
+    deleter m_deleter{ deleters::delete_item< LibGitItemType > };
 };
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////                GitItemCreator           //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-class GitItemCreator
+class git_item_creator
 {
-    using FactoryStorage = std::map< item::Type, std::unique_ptr< GitItemFactoryIf > >;
+    using factory_storage = std::map< item::type, std::unique_ptr< igit_item_factory > >;
 
-public:
-    GitItemCreator(){}
-    GitItemCreator( const GitItemCreator& ) = delete;
-    GitItemCreator( GitItemCreator&& ) = delete;
-    GitItemCreator& operator=( const GitItemCreator& ) = delete;
-    GitItemCreator& operator=( GitItemCreator&& ) = delete;
+private:
+    git_item_creator() = default;
+
+public:    
+    git_item_creator( const git_item_creator& ) = delete;
+    git_item_creator( git_item_creator&& ) = delete;
+    git_item_creator& operator=( const git_item_creator& ) = delete;
+    git_item_creator& operator=( git_item_creator&& ) = delete;
 
     template < class LibGitItemType >
-    bool registerItemType( const item::Type itemType, std::unique_ptr< GitItemFactoryIf >&& factory )
+    bool register_item_type( const item::type& item_type, std::unique_ptr< igit_item_factory >&& factory )
     {
-        std::lock_guard< std::mutex > g( mMutex );
+        std::lock_guard< std::mutex > l{ m_mutex };
 
-        if ( !mFactories.count( itemType ) )
+        if( !m_factories.count( item_type ) )
         {
-            mFactories.emplace( itemType, std::move( factory ) );
+            m_factories.emplace( item_type, std::move( factory ) );
             return true;
         }
 
@@ -78,13 +80,12 @@ public:
     }
 
     template< class GitItemType, typename = std::enable_if_t< item::is_git_item< GitItemType >::value > >
-    std::unique_ptr< GitItemType > create( const item::Type itemType, typename GitItemType::_internalType* manage = nullptr )
+    std::unique_ptr< GitItemType > create( const item::type itemType, typename GitItemType::_internalType* manage = nullptr )
     {
-        std::lock_guard< std::mutex > g( mMutex );
+        std::lock_guard< std::mutex > l{ m_mutex };
 
-        auto factory = mFactories.find( itemType );
-
-        if ( factory != mFactories.end() )
+        auto factory = m_factories.find( itemType );
+        if ( factory != m_factories.end() )
         {
             auto result = details::dynamic_unique_pointer_cast< GitItemType >( factory->second->create() );
             result->reset( manage );
@@ -94,15 +95,15 @@ public:
         return nullptr;
     }
 
-    static GitItemCreator& get()
+    static git_item_creator& get()
     {
-        static GitItemCreator instance;
+        static git_item_creator instance;
         return instance;
     }
 
 private:
-    FactoryStorage mFactories;
-    std::mutex mMutex;
+    factory_storage m_factories;
+    std::mutex m_mutex;
 };
 
 }// factory

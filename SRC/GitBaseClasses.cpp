@@ -16,102 +16,102 @@ namespace base
 ///////////////                 Commit                  //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Commit::Commit( std::unique_ptr< GitCommit >&& commit ) : mCommit( std::move( commit ) )
+commit_wrapper::commit_wrapper( std::unique_ptr< git_item_commit >&& commit ) : m_commit( std::move( commit ) )
 {
 
 }
 
-git_oid Commit::id() const noexcept
+git_oid commit_wrapper::id() const noexcept
 {
     git_oid id;
 
-    if ( isValid() )
+    if( isValid() )
     {
-        const git_oid* cId = git_commit_id( mCommit->get() );
+        const git_oid* cId = git_commit_id( m_commit->get() );
         id = *cId;
     }
 
     return id;
 }
 
-git_time Commit::time() const noexcept
+git_time commit_wrapper::time() const noexcept
 {
     git_time time;
 
-    if ( isValid() )
+    if( isValid() )
     {
-        time = git_commit_author( mCommit->get() )->when;
+        time = git_commit_author( m_commit->get() )->when;
     }
 
     return time;
 }
 
-std::string Commit::author() const noexcept
+std::string commit_wrapper::author() const noexcept
 {
     std::string author;
 
-    if ( isValid() )
+    if( isValid() )
     {
-        author = git_commit_author( mCommit->get() )->name;
+        author = git_commit_author( m_commit->get() )->name;
 	}
 
 	return author;
 }
 
-std::string Commit::message() const noexcept
+std::string commit_wrapper::message() const noexcept
 {
     std::string message;
 
-    if ( isValid() )
+    if( isValid() )
     {
-        message = git_commit_message( mCommit->get() );
+        message = git_commit_message( m_commit->get() );
 	}
 
 	return message;
 }
 
-bool Commit::isValid() const noexcept
+bool commit_wrapper::isValid() const noexcept
 {
-    return mCommit != nullptr && mCommit->get() != nullptr;
+    return m_commit != nullptr && m_commit->get() != nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////                Branch                   //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Branch::Branch( std::unique_ptr< GitRef >&& branchRef,
-                const bool isRemote,
-                const std::shared_ptr< Repo > parentRepo ) :
-                mBranchRef( std::move( branchRef ) ),
-                mIsRemote( isRemote ),
-                mParentRepo( parentRepo )
+branch_wrapper::branch_wrapper( std::unique_ptr< git_item_ref >&& branch_ref,
+                const bool is_remote,
+                const std::shared_ptr< repo_wrapper > parent_repo ) :
+                m_is_remote( is_remote ),
+                m_parent_repo( parent_repo ),
+                m_branch_ref( std::move( branch_ref ) )
 {
 
 }
 
-void Branch::addCommit( std::unique_ptr< Commit >&& commit )
+void branch_wrapper::add_commit( std::unique_ptr< commit_wrapper >&& commit )
 {
-    CommitId id( commit->time().time, commit->message() );
+    commit_id id( commit->time().time, commit->message() );
 
-    if (!mCommits.count(id))
+    if( !m_commits.count( id ) )
     {
-        mCommits.emplace( id, std::move( commit ) );
+        m_commits.emplace( id, std::move( commit ) );
     }
 }
 
-void Branch::clearCommits() noexcept
+void branch_wrapper::clear_commits() noexcept
 {
-    mCommits.clear();
+    m_commits.clear();
 }
 
-std::string Branch::name() const noexcept
+std::string branch_wrapper::name() const noexcept
 {
     std::string name;
 
-    if (isValid())
+    if( is_valid() )
     {
-        const char* c_name;
-        if ( git_branch_name( &c_name, mBranchRef->get() ) == 0 )
+        const char* c_name{ nullptr };
+        if ( git_branch_name( &c_name, m_branch_ref->get() ) == 0 )
         {
             name = c_name;
         }
@@ -120,286 +120,247 @@ std::string Branch::name() const noexcept
     return name;
 }
 
-auto Branch::commits() const noexcept -> const CommitStorage&
+auto branch_wrapper::commits() const noexcept -> const commit_storage&
 {
-    return mCommits;
+    return m_commits;
 }
 
-bool Branch::isRemote() const noexcept
+bool branch_wrapper::is_remote() const noexcept
 {
-    return mIsRemote;
+    return m_is_remote;
 }
 
-bool Branch::isValid() const noexcept
+bool branch_wrapper::is_valid() const noexcept
 {
-    return mBranchRef != nullptr &&
-           mBranchRef.get() != nullptr;
+    return m_branch_ref && m_branch_ref.get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////                   Repo                  //////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-Repo::Repo( const std::string& repoPath,
-            std::unique_ptr< GitRepo >&& repo ) :
-            mLocalPath( repoPath),
-            mGitRepo( std::move( repo ) )
+repo_wrapper::repo_wrapper( const std::string& repo_path,
+                            std::unique_ptr< git_item_repo >&& repo ) :
+                            m_local_path( repo_path),
+                            m_git_repo( std::move( repo ) )
 {
 
 }
 
-bool Repo::openLocal( const std::string& path )
+void repo_wrapper::open_local( const std::string& path )
 {
-    closeRepo();
+    close();
 		
-    git_repository* r;
-    if ( git_repository_open( &r, path.c_str() ) != 0 )
+    git_repository* r{ nullptr };
+    if( git_repository_open( &r, path.c_str() ) != 0 )
     {
-        return false;
+        throw std::runtime_error{ "Could not open local repository " + path };
     }
 
-    mGitRepo = factory::GitItemCreator::get().create< GitRepo >( item::Type::GIT_REPO, r );
-    mLocalPath = path;
-
-    return true;
+    m_git_repo = factory::git_item_creator::get().create< git_item_repo >( item::type::GIT_REPO, r );
+    m_local_path = path;
 }
 
-bool Repo::updateRemotes( const git_fetch_options& fetch_opts )
+void repo_wrapper::update_remotes( const git_fetch_options& fetch_opts )
 {
-    if ( !isValid() )
+    if( !is_valid() )
     {
-        return false;
+        throw std::logic_error{ "Repository is not valid" };
     }
 	
-    RemotesList remotesList;
-    if ( !readRemotesList(remotesList) )
+    remotes_set remotes_list;
+    read_remotes_list( remotes_list );
+
+    if( !remotes_list.size() )
     {
-        return false;
+        return;
     }
 
-    if ( !remotesList.size() )
+    for ( auto remote = m_remotes.begin(); remote != m_remotes.end(); )
     {
-        return true;
-    }
-
-    for ( auto remote = mRemotes.begin(); remote != mRemotes.end(); )
-    {
-        if ( !remotesList.count( remote->first ) )
+        if( !remotes_list.count( remote->first ) )
         {
-            mRemotes.erase(remote);
+            m_remotes.erase(remote);
         }
 		
         remote++;
     }
-		
-    bool result = true;
-    for ( auto name : remotesList )
+
+    for( auto name : remotes_list )
     {
-        auto remoteStor = mRemotes.find(name);
-        if ( remoteStor == mRemotes.end() )
+        auto remoteStor = m_remotes.find(name);
+        if ( remoteStor == m_remotes.end() )
         {
-            git_remote* remote = nullptr;
-            if ( git_remote_lookup( &remote, mGitRepo->get(), name.c_str() ) != 0)
+            git_remote* remote{ nullptr };
+            if( git_remote_lookup( &remote, m_git_repo->get(), name.c_str() ) != 0 )
             {
-                return false;
+                throw std::logic_error{ "Could not find remote " + name };
             }
 			
-            std::string url = git_remote_url( remote );
-            std::string name = git_remote_name( remote );
+            std::string url{ git_remote_url( remote ) };
+            std::string name{ git_remote_name( remote ) };
 
-            printf("Fetching from %s: %s\n", name.c_str(), url.c_str());
+            printf( "Fetching from %s: %s\n", name.c_str(), url.c_str() );
 
-            auto remotePtr = factory::GitItemCreator::get().create< GitRemote >( item::Type::GIT_REMOTE, remote );
+            auto remotePtr = factory::git_item_creator::get().create< git_item_remote >( item::type::GIT_REMOTE, remote );
 
-            mRemotes.emplace( name, std::move( remotePtr ) );
+            m_remotes.emplace( name, std::move( remotePtr ) );
         }
     }
-
-    return true;
 }
 
-bool Repo::fetch( const git_fetch_options& fetch_opts )
+void repo_wrapper::fetch( const git_fetch_options& fetch_opts )
 {
-    if ( !isValid() )
+    if( !is_valid() )
     {
-        return false;
+        throw std::logic_error{ "Repository is not valid" };
     }
 
-    if ( !updateRemotes(fetch_opts) )
-    {
-        return false;
-    }
+    update_remotes( fetch_opts );
 
-    for ( auto& remote : mRemotes )
+    for( auto& remote : m_remotes )
     {
-        auto arr = Aux::createStrArr();
-        if (arr == nullptr)
+        auto arr = aux::create_str_arr();
+        if( git_remote_fetch( remote.second->get(), arr->get(), &fetch_opts, nullptr) != 0 )
         {
-            return false;
-        }
-
-        if ( git_remote_fetch( remote.second->get(), arr->get(), &fetch_opts, nullptr) != 0 )
-        {
-            return false;
+            throw std::logic_error{ "Could not fetch remote " + remote.first };
         }
     }
-
-    return true;
 }
 
-bool Repo::clone( const std::string& url, const std::string& path, const git_clone_options& cloneOpts )
+void repo_wrapper::clone( const std::string& url, const std::string& path, const git_clone_options& clone_opts )
 {
-    closeRepo();
+    close();
 
-    git_repository* r;
-    if ( git_clone( &r, url.c_str(), path.c_str(), &cloneOpts ) != 0 )
+    git_repository* r{ nullptr };
+    if( git_clone( &r, url.c_str(), path.c_str(), &clone_opts ) != 0 )
     {
-        return false;
+        throw std::logic_error{ "Could not clone repository " + url };
     }
 
-    mGitRepo = factory::GitItemCreator::get().create< GitRepo >( item::Type::GIT_REPO, r );
-	    
-    return true;
+    m_git_repo = factory::git_item_creator::get().create< git_item_repo >( item::type::GIT_REPO, r );
 }
 
-void Repo::closeRepo() noexcept
+void repo_wrapper::close() noexcept
 {
-    mGitRepo.reset();
-    mLocalPath = {};
-    mRemotes.clear();
+    m_git_repo.reset();
+    m_local_path.clear();
+    m_remotes.clear();
 }
 
-bool Repo::readRemotesList(RemotesList& remotesList)
+void repo_wrapper::read_remotes_list( remotes_set& remotes_list )
 {
-    if (!isValid()){
-        return false;
+    if( !is_valid() )
+    {
+        throw std::logic_error{ "Repository is not valid" };
     }
 
-    auto remoteList = Aux::createStrArr();
-    if ( remoteList == nullptr )
+    auto remote_list = aux::create_str_arr();
+    if( git_remote_list( remote_list->get(), m_git_repo->get() ) != 0 )
     {
-        return false;
+        throw std::logic_error{ "Could not get remotes list" };
     }
 
-    if ( git_remote_list( remoteList->get(), mGitRepo->get() ) != 0 )
+    for( size_t str_num = 0; str_num < remote_list->get()->count; ++str_num )
     {
-        return false;
-    }
-
-    for ( size_t strNum = 0; strNum < remoteList->get()->count; ++strNum )
-    {
-        remotesList.insert( remoteList->get()->strings[strNum] );
-    }
-				
-    return true;
+        remotes_list.insert( remote_list->get()->strings[ str_num ] );
+    }				
 }
 
-bool Repo::isValid() const noexcept
+bool repo_wrapper::is_valid() const noexcept
 {
-    return mGitRepo != nullptr &&
-           mGitRepo->get() != nullptr &&
-           mLocalPath.length();
+    return m_git_repo != nullptr &&
+           m_git_repo->get() != nullptr &&
+           m_local_path.length();
 }
 
-std::string Repo::path() const noexcept
+std::string repo_wrapper::path() const noexcept
 {
-    return mLocalPath;
+    return m_local_path;
 }
 
 
-bool Repo::readBranchCommits( Branch* branch )
+void repo_wrapper::read_branch_commits( branch_wrapper* branch )
 {
-    if ( !isValid() )
+    if( !is_valid() )
     {
-        return false;
+        throw std::logic_error{ "Repository is not valid" };
     }
 	
-    git_oid* oid = const_cast< git_oid* >( git_reference_target( branch->mBranchRef->get() ) );
-    if (oid == nullptr)
+    auto oid = const_cast< git_oid* >( git_reference_target( branch->m_branch_ref->get() ) );
+    if( !oid )
     {
-        return false;
+        throw std::runtime_error{ "Could not get branch ref" };
     }
 	   
-    git_revwalk *gitWalker;
+    git_revwalk* git_walker{ nullptr };
 
-    if ( git_revwalk_new( &gitWalker, mGitRepo->get() ) != 0 )
+    if( git_revwalk_new( &git_walker, m_git_repo->get() ) != 0 )
     {
-        return false;
+        throw std::runtime_error{ "Could not create revwalk" };
     }
 	
-    auto walker = factory::GitItemCreator::get().create< GitRevWalk >( item::Type::GIT_REV_WALK, gitWalker );
+    auto walker = factory::git_item_creator::get().create< git_item_rev_walk >( item::type::GIT_REV_WALK, git_walker );
 
     git_revwalk_sorting( walker->get(), GIT_SORT_TOPOLOGICAL );
     git_revwalk_push( walker->get(), oid );
-			
-    bool result = true;
-    std::vector< git_oid > iDs;
-
-    while ( git_revwalk_next( oid, walker->get() ) == 0)
+			   
+    while ( git_revwalk_next( oid, walker->get() ) == 0 )
     {
-        git_commit* commit;
-        if ( git_commit_lookup( &commit, mGitRepo->get(), oid ) != 0 )
+        git_commit* commit{ nullptr };
+        if( git_commit_lookup( &commit, m_git_repo->get(), oid ) != 0 )
         {
-            result = false;
-            break;
+            branch->clear_commits();
+            throw std::logic_error{ "Could not read branch commits" };
         }
 
-        auto commitPtr = factory::GitItemCreator::get().create< GitCommit >( item::Type::GIT_COMMIT, commit );
-        auto cPtr = std::make_unique< Commit >( std::move( commitPtr ) );
+        auto commit_ptr = factory::git_item_creator::get().create< git_item_commit >( item::type::GIT_COMMIT, commit );
+        auto ptr = std::make_unique< commit_wrapper >( std::move( commit_ptr ) );
 
-        branch->addCommit( std::move( cPtr ) );
+        branch->add_commit( std::move( ptr ) );
     }
-
-    if (!result)
-    {
-        branch->clearCommits();
-    }
-
-    return result;
 }
 
-bool Repo::getBranches( BranchStorage& branchStorage, const bool getRemotes )
+bool repo_wrapper::get_branches( branches& branchStorage, const bool getRemotes )
 {
-    if ( !isValid() )
+    if( !is_valid() )
     {
-        printf("Get local branches: Repo not initialized\n");
-        return false;
+        throw std::logic_error{ "Repository is not valid" };
     }
 
-    auto arr = Aux::getRepoRefList( mGitRepo.get() );
-    if ( arr == nullptr )
+    auto arr = aux::get_repo_ref_list( m_git_repo.get() );
+    if( !arr )
     {
-        printf( "Get local branches: Failed to get repo's refs list\n" );
-        return false;
+        throw std::logic_error{ "Failed to get repo's refs list" };
     }
 
-    for ( size_t refNum = 0; refNum < arr->get()->count; ++refNum )
+    for( size_t ref_num = 0; ref_num < arr->get()->count; ++ref_num )
     {
-        std::string refName = arr->get()->strings[refNum];
+        std::string ref_name = arr->get()->strings[ ref_num ];
 
-        auto refPtr = Aux::getReference( refName, mGitRepo.get() );
-        if ( refPtr == nullptr )
+        auto ref_ptr = aux::get_reference( ref_name, m_git_repo.get() );
+        if ( !ref_ptr)
         {
             branchStorage.clear();
-            return false;
+            throw std::logic_error{ "Could not get reference for " + ref_name };
         }
 
-        using CheckFunc = int (*)(const git_reference *);
+        using check_func = int (*)( const git_reference* );
 
-        CheckFunc checkFunc = getRemotes?
+        check_func checkFunc = getRemotes?
                               git_reference_is_remote : git_reference_is_branch;
 
-        if ( checkFunc( refPtr->get() ) )
+        if( checkFunc( ref_ptr->get() ) )
         {
-            auto branch = std::make_unique<Branch>( std::move( refPtr ), true);
+            auto branch = std::make_unique< branch_wrapper >( std::move( ref_ptr ), true );
             branchStorage.emplace( branch->name(), std::move( branch ) );
         }
     }
 
-    for ( const auto& branch : branchStorage )
+    for( const auto& branch : branchStorage )
     {
-        printf("Reading branch commits for branch: %s\r", branch.first.c_str());
-        readBranchCommits( branch.second.get() );
+        //printf( "Reading branch commits for branch: %s\r", branch.first.c_str() );
+        read_branch_commits( branch.second.get() );
     }
 
     printf("\n");
@@ -407,28 +368,24 @@ bool Repo::getBranches( BranchStorage& branchStorage, const bool getRemotes )
     return true;
 }
 
-std::unique_ptr< Branch > Repo::getBranch( const std::string& refName )
+std::unique_ptr< branch_wrapper > repo_wrapper::get_branch( const std::string& ref_name )
 {
-    auto refPtr = Aux::getReference( refName, mGitRepo.get() );
-    if ( refPtr != nullptr )
+    auto ref_ptr = aux::get_reference( ref_name, m_git_repo.get() );
+    if ( ref_ptr )
     {
-        int isRemote = false;
-        int isLocal = git_reference_is_branch( refPtr->get() );
+        int is_remote{ false };
+        int is_local{ git_reference_is_branch( ref_ptr->get() ) };
 
-        if (!isLocal)
+        if( !is_local )
         {
-            isRemote = git_reference_is_remote(refPtr->get());
+            is_remote = git_reference_is_remote( ref_ptr->get() );
         }
 
-        if (isLocal || isRemote)
+        if( is_local || is_remote )
         {
-            auto branch = std::make_unique< Branch >( std::move( refPtr ), isRemote );
+            auto branch = std::make_unique< branch_wrapper >( std::move( ref_ptr ), is_remote );
 
-            if ( !readBranchCommits( branch.get() ) )
-            {
-                branch.reset();
-            }
-
+            read_branch_commits( branch.get() );
             return branch;
         }
     }
@@ -440,82 +397,80 @@ std::unique_ptr< Branch > Repo::getBranch( const std::string& refName )
 /////////////////                   Aux                   //////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-std::unique_ptr< GitStrArr > Aux::createStrArr()
+std::unique_ptr< git_item_str_arr > aux::create_str_arr()
 {
-    auto remoteList = factory::GitItemCreator::get().create< GitStrArr >( item::Type::GIT_STR_ARR );
+    auto remoteList = factory::git_item_creator::get().create< git_item_str_arr >( item::type::GIT_STR_ARR );
     remoteList->get()->count = 0;
     return remoteList;
 }
 
-std::string Aux::getCommitMessageStr( const Commit* commit )
+std::string aux::get_commit_message_str( const commit_wrapper* commit )
 {
-    if (commit == nullptr)
+    if( !commit )
     {
         return std::string{};
     }
 
-    std::string rawMessage = commit->message();
+    std::string raw_message{ commit->message() };
     std::vector< std::string > parts;
 
-    boost::split( parts, rawMessage, boost::is_any_of("\n") );
-    rawMessage = boost::join_if( parts,
+    boost::split( parts, raw_message, boost::is_any_of( "\n" ) );
+    raw_message = boost::join_if( parts,
                                  "\n",
-                                 [](const std::string& str)->bool
-                                 { return str.length() != 0; } );
+                                 []( const std::string& str ) -> bool
+                                 { return !str.empty(); } );
 
 
-    auto commitTime = commit->time();
+    auto commit_time = commit->time();
 
     using namespace boost::posix_time;
 
-    time_duration td( 0, 0, 0, time_duration::ticks_per_second() * ( commitTime.time + commitTime.offset * 60 ) );
-    ptime dtime = ptime(boost::gregorian::date(1970, 1, 1), td);
+    time_duration td{ 0, 0, 0, time_duration::ticks_per_second() * ( commit_time.time + commit_time.offset * 60 ) };
+    ptime dtime{ boost::gregorian::date{ 1970, 1, 1 }, td };
 
-    std::string message = ( boost::format("[%s]\n%s\n%s\n\n")
-                            % dtime
-                            % rawMessage
-                            % commit->author() ).str();
+    std::string message{ ( boost::format( "[%s]\n%s\n%s\n\n" )
+                           % dtime
+                           % raw_message
+                           % commit->author() ).str() };
 
     return message;
 }
 
-std::unique_ptr< GitRef > Aux::getReference( const std::string& refName, const GitRepo* repo )
+std::unique_ptr< git_item_ref > aux::get_reference( const std::string& ref_name, const git_item_repo* repo )
 {
-    git_reference* ref = nullptr;
-    if (git_reference_lookup(&ref, repo->get(), refName.c_str()) == 0)
+    git_reference* ref{ nullptr };
+    if( git_reference_lookup( &ref, repo->get(), ref_name.c_str() ) == 0 )
     {
-        auto refPtr = factory::GitItemCreator::get().create< GitRef >( item::Type::GIT_REF, ref );
-        return refPtr;
+        auto ref_ptr = factory::git_item_creator::get().create< git_item_ref >( item::type::GIT_REF, ref );
+        return ref_ptr;
     }
 
     return nullptr;
 }
 
-std::unique_ptr< GitCommit > Aux::readCommit( const GitRepo* repo, const git_oid *head )
+std::unique_ptr< git_item_commit > aux::read_commit( const git_item_repo* repo, const git_oid* head )
 {
-    git_commit* gitCommit;
+    git_commit* commit{ nullptr };
 
-    if ( repo != nullptr &&
-         head != nullptr &&
-         git_commit_lookup( &gitCommit, repo->get(), head ) == 0)
+    if ( repo && head &&
+         git_commit_lookup( &commit, repo->get(), head ) == 0 )
     {
-        auto commit = factory::GitItemCreator::get().create< GitCommit >( item::Type::GIT_COMMIT, gitCommit );
-        return commit;
+        auto commit_ptr = factory::git_item_creator::get().create< git_item_commit >( item::type::GIT_COMMIT, commit );
+        return commit_ptr;
     }
 
     return nullptr;
 }
 
-std::unique_ptr< GitStrArr > Aux::getRepoRefList( const GitRepo* repo )
+std::unique_ptr< git_item_str_arr > aux::get_repo_ref_list( const git_item_repo* repo )
 {
-    std::unique_ptr< GitStrArr > result;
+    std::unique_ptr< git_item_str_arr > result;
 
-    if ( repo != nullptr )
+    if( repo )
     {
-        result = Aux::createStrArr();
+        result = aux::create_str_arr();
 
-        if ( result == nullptr ||
-             git_reference_list( result->get(), repo->get() ) != 0 )
+        if( !result || git_reference_list( result->get(), repo->get() ) != 0 )
         {
             result.reset();
         }
@@ -524,42 +479,42 @@ std::unique_ptr< GitStrArr > Aux::getRepoRefList( const GitRepo* repo )
     return result;
 }
 
-std::string Aux::getBranchName( const std::string& fullBranchName )
+std::string aux::get_branch_name( const std::string& fullBranchName )
 {
     //TODO
     return fullBranchName;
 }
 
-void Aux::printBranches(const Repo::BranchStorage& storage)
+void aux::print_branches(const repo_wrapper::branches& storage)
 {
     printf( "\n-------------------\n" );
     printf( "%s\n", "BRANCHES" );
     printf( "-------------------\n\n" );
 	
-    for ( auto& branch : storage )
+    for( const auto& branch : storage )
     {
         printf( "%s\n", branch.first.c_str() );
     }
 }
 
-void Aux::printCommit(const Commit* commit)
+void aux::print_commits(const commit_wrapper* commit)
 {
-    std::string message = Aux::getCommitMessageStr( commit );
+    std::string message = aux::get_commit_message_str( commit );
     printf( "%s", message.c_str() );
 }
 
-void Aux::printBranchCommits( const Branch* branch )
+void aux::print_branch_commits( const branch_wrapper* branch )
 {
-    if ( branch != nullptr )
+    if( branch )
     {
         printf( "\n-------------------\n" );
         printf( "%s\n", branch->name().c_str() );
         printf( "-------------------\n\n" );
 
         auto& commits = branch->commits();
-        for ( const auto& commit : commits )
+        for( const auto& commit : commits )
         {
-            printCommit( commit.second.get() );
+            print_commits( commit.second.get() );
         }
     }
 }

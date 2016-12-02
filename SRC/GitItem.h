@@ -11,7 +11,7 @@ namespace details
 
 // helper alias to conveniently determine unique_ptr base for GitItem
 template< class T >
-using UniquePtrBase = std::unique_ptr< T, TypeDeleter< T > >;
+using unique_ptr_base = std::unique_ptr< T, type_deleter< T > >;
 
 template< typename T >
 struct tag_checker { using type = void; };
@@ -28,16 +28,16 @@ namespace item
 {
 
 // Base item class
-class Item
+class item
 {
 public:
-    virtual ~Item() = default;
+    virtual ~item() = default;
 };
 
 template< class LibGitItemType >
-class GitItem : public Item, public details::UniquePtrBase< LibGitItemType >
+class git_item : public item, public details::unique_ptr_base< LibGitItemType >
 {    
-    using details::UniquePtrBase< LibGitItemType >::unique_ptr;
+    using details::unique_ptr_base< LibGitItemType >::unique_ptr;
 
 public:
     using _internalType = LibGitItemType;
@@ -48,10 +48,10 @@ template< typename T, typename = void, typename = void >
 struct is_git_item : std::false_type{};
 
 template< typename T >
-struct is_git_item< T, details::tag_checker_t< T >, std::enable_if_t< std::is_base_of< Item, T >::value > > : std::true_type{};
+struct is_git_item< T, details::tag_checker_t< T >, std::enable_if_t< std::is_base_of< item, T >::value > > : std::true_type{};
 
 // Item types
-enum class Type;
+enum class type;
 
 } //item
 

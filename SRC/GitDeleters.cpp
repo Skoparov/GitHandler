@@ -7,53 +7,54 @@ namespace deleters
 {
 
 template<>
-void deleteItem( git_repository* repo )
+void delete_item( git_repository* repo )
 {
-    if (repo != nullptr)
+    if( repo != nullptr )
     {
-        git_repository_free(repo);
+        git_repository_free( repo );
         repo = nullptr;
     }
 }
 
 template<>
-void deleteItem( git_remote* remote )
+void delete_item( git_remote* remote )
 {
-    if (remote != nullptr)
+    if( remote != nullptr )
     {
-        git_remote_disconnect(remote);
-        git_remote_free(remote);
+        git_remote_disconnect( remote );
+        git_remote_free( remote );
         remote = nullptr;
     }
 }
 
 template<>
-void deleteItem( git_commit* commit )
+void delete_item( git_commit* commit )
 {
-    if (commit != nullptr)
+    if( commit != nullptr )
     {
-        git_commit_free(commit);
+        git_commit_free( commit );
         commit = nullptr;
     }
 }
 
 template<>
-void deleteItem( git_reference* refNum )
+void delete_item( git_reference* ref_num )
 {
-    if (refNum != nullptr)
+    if( ref_num != nullptr )
     {
-        git_reference_free(refNum);
-        refNum = nullptr;
+        git_reference_free( ref_num );
+        ref_num = nullptr;
     }
 }
 
 template<>
-void deleteItem( git_strarray* arr )
+void delete_item( git_strarray* arr )
 {
-    if (arr != nullptr)
+    if( arr != nullptr )
     {
-        if (arr->count){
-            git_strarray_free(arr);
+        if( arr->count )
+        {
+            git_strarray_free( arr );
         }
 
         delete arr;
@@ -62,11 +63,11 @@ void deleteItem( git_strarray* arr )
 }
 
 template<>
-void deleteItem( git_revwalk* rv )
+void delete_item( git_revwalk* rv )
 {
-    if (rv != nullptr)
+    if( rv != nullptr )
     {
-        git_revwalk_free(rv);
+        git_revwalk_free( rv );
         rv = nullptr;
     }
 }

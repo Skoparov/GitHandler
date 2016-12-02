@@ -13,23 +13,23 @@ namespace base
 {
 
 // Item aliases
-using GitRef     = item::GitItem< git_reference >;
-using GitRepo    = item::GitItem< git_repository >;
-using GitRemote  = item::GitItem< git_remote >;
-using GitCommit  = item::GitItem< git_commit >;
-using GitStrArr  = item::GitItem< git_strarray >;
-using GitRevWalk = item::GitItem< git_revwalk >;
+using git_item_ref = item::git_item< git_reference >;
+using git_item_repo = item::git_item< git_repository >;
+using git_item_remote = item::git_item< git_remote >;
+using git_item_commit = item::git_item< git_commit >;
+using git_item_str_arr = item::git_item< git_strarray >;
+using git_item_rev_walk = item::git_item< git_revwalk >;
 
-class Repo;
+class repo_wrapper;
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////                 Commit                  //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-class Commit : public std::enable_shared_from_this< Commit >
+class commit_wrapper : public std::enable_shared_from_this< commit_wrapper >
 {
 public:
-    explicit Commit( std::unique_ptr< GitCommit >&& commit = nullptr );
+    explicit commit_wrapper( std::unique_ptr< git_item_commit >&& commit = nullptr );
 
     git_oid id() const noexcept;
     git_time time() const noexcept;
@@ -38,100 +38,100 @@ public:
     bool isValid() const noexcept;
 
 private:	
-    std::unique_ptr< GitCommit > mCommit;
+    std::unique_ptr< git_item_commit > m_commit;
 };
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////                Branch                   //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-class Branch : public std::enable_shared_from_this< Branch >
+class branch_wrapper : public std::enable_shared_from_this< branch_wrapper >
 {
-    friend class Repo;
+    friend class repo_wrapper;
 
 public:
-    using CommitId      = std::pair< git_time_t, std::string >;
-    using CommitStorage = std::map< CommitId, std::unique_ptr< Commit > >;
+    using commit_id = std::pair< git_time_t, std::string >;
+    using commit_storage = std::map< commit_id, std::unique_ptr< commit_wrapper > >;
 
 public:
-    Branch( std::unique_ptr< GitRef >&& branchRef = nullptr,
-            const bool isRemote = false,
-            const std::shared_ptr< Repo > parentRepo = nullptr );
+    branch_wrapper( std::unique_ptr< git_item_ref >&& branch_ref = nullptr,
+            const bool is_remote = false,
+            const std::shared_ptr< repo_wrapper > parent_repo = nullptr );
 
-    void addCommit( std::unique_ptr< Commit >&& commit );
-    void clearCommits() noexcept;
+    void add_commit( std::unique_ptr< commit_wrapper >&& commit_wrapper );
+    void clear_commits() noexcept;
 	
     std::string name() const noexcept;
-    const CommitStorage& commits() const noexcept;
+    const commit_storage& commits() const noexcept;
 
-    bool isRemote() const noexcept;
-    bool isValid() const noexcept;
+    bool is_remote() const noexcept;
+    bool is_valid() const noexcept;
 	
 private:
-    CommitStorage mCommits;
-    std::unique_ptr< GitRef > mBranchRef;
-    bool mIsRemote;
-    std::weak_ptr< Repo > mParentRepo;
+    bool m_is_remote;
+    commit_storage m_commits;
+    std::weak_ptr< repo_wrapper > m_parent_repo;
+    std::unique_ptr< git_item_ref > m_branch_ref;
+
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////                   Repo                  //////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-class Repo : public std::enable_shared_from_this< Repo >
+class repo_wrapper : public std::enable_shared_from_this< repo_wrapper >
 {
 public:
-    using BranchStorage = std::map< std::string, std::unique_ptr< Branch > >;
-    using Remotes = std::map< std::string, std::unique_ptr< GitRemote > >;
+    using branches = std::map< std::string, std::unique_ptr< branch_wrapper > >;
+    using remotes = std::map< std::string, std::unique_ptr< git_item_remote > >;
 
 private:
-    using RemotesList   = std::set< std::string >;
+    using remotes_set = std::set< std::string >;
 
 public:
-    Repo( const std::string& repoPath = {},
-          std::unique_ptr< GitRepo >&& repo = nullptr );
+    explicit repo_wrapper( const std::string& repoPath = {},
+                   std::unique_ptr< git_item_repo >&& repo_wrapper = nullptr );
 	
     // repo operations
-    bool openLocal( const std::string& path );
-    bool fetch( const git_fetch_options& fetch_opts = GIT_FETCH_OPTIONS_INIT );
-    bool clone( const std::string& url, const std::string& path, const git_clone_options& cloneOpts = GIT_CLONE_OPTIONS_INIT );
-    void closeRepo() noexcept;
+    void open_local( const std::string& path );
+    void fetch( const git_fetch_options& fetch_opts = GIT_FETCH_OPTIONS_INIT );
+    void clone( const std::string& url, const std::string& path, const git_clone_options& cloneOpts = GIT_CLONE_OPTIONS_INIT );
+    void close() noexcept;
 
     // getters
-    bool isValid() const noexcept;
+    bool is_valid() const noexcept;
     std::string path() const noexcept;
-    std::unique_ptr< Branch > getBranch( const std::string& refName );
-    bool getBranches( BranchStorage& branchStor, const bool getRemotes = false );
+    std::unique_ptr< branch_wrapper > get_branch( const std::string& ref_name );
+    bool get_branches( branches& branchStor, const bool get_remotes = false );
 
 private:
-    bool readRemotesList( RemotesList& remotesList );
-    bool readBranchCommits( Branch* branch);
-    bool updateRemotes(const git_fetch_options& fetch_opts);
+    void read_remotes_list( remotes_set& remotesList );
+    void read_branch_commits( branch_wrapper* branch_wrapper);
+    void update_remotes(const git_fetch_options& fetch_opts);
 
 private:
-    std::string mLocalPath;
-    std::unique_ptr< GitRepo > mGitRepo;
-    Remotes mRemotes;
+    remotes m_remotes;
+    std::string m_local_path;
+    std::unique_ptr< git_item_repo > m_git_repo;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////                   Aux                   //////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-class Aux
+namespace aux
 {
-public:
-    static std::unique_ptr< GitStrArr > createStrArr();
-    static std::string                  getCommitMessageStr( const Commit* commit );
-    static std::unique_ptr< GitRef >    getReference( const std::string& refName, const GitRepo* repo );
-    static std::unique_ptr< GitCommit > readCommit(const GitRepo* repo, const git_oid* head );
-    static std::unique_ptr< GitStrArr > getRepoRefList( const GitRepo* repo );
-    static std::string                  getBranchName( const std::string& fullBranchName );
+    std::unique_ptr< git_item_str_arr > create_str_arr();
+    std::string get_commit_message_str( const commit_wrapper* commit_wrapper );
+    std::unique_ptr< git_item_ref > get_reference( const std::string& ref_name, const git_item_repo* repo_wrapper );
+    std::unique_ptr< git_item_commit > read_commit(const git_item_repo* repo_wrapper, const git_oid* head );
+    std::unique_ptr< git_item_str_arr > get_repo_ref_list( const git_item_repo* repo_wrapper );
+    std::string get_branch_name( const std::string& full_branch_name );
 
-    static void printBranches( const Repo::BranchStorage& storage );
-    static void printCommit( const Commit* commit );
-    static void printBranchCommits( const Branch* branch );
-};
+    void print_branches( const repo_wrapper::branches& storage );
+    void print_commits( const commit_wrapper* commit_wrapper );
+    void print_branch_commits( const branch_wrapper* branch_wrapper );
+}
 
 }//base
 

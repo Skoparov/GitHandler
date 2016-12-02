@@ -12,34 +12,34 @@ namespace git_handler
 ///////////////                GitHandler               //////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-class GitHandler
+class git_handler
 {
 public:
-    using NewBranchStorage = std::map< std::string, std::vector< base::Branch* > >;
-    using NewCommitStorage = std::map< std::pair< std::string, std::string >, std::vector< base::Commit* > > ;
-    using Credentials      = std::map< std::string, std::pair< std::string, std::string > >;
-    using RepoStorage      = std::map< std::string, std::unique_ptr< base::Repo > >;
+    using new_braches = std::map< std::string, std::vector< base::branch_wrapper* > >;
+    using new_commits = std::map< std::pair< std::string, std::string >, std::vector< base::commit_wrapper* > > ;
+    using credentials = std::map< std::string, std::pair< std::string, std::string > >;
+    using repos = std::map< std::string, std::unique_ptr< base::repo_wrapper > >;
 
+public:
+    git_handler();
+    git_handler( const git_handler& ) = delete;
+    git_handler( git_handler&& ) = delete;
+    git_handler& operator=( const git_handler& ) = delete;
+    git_handler& operator=( git_handler&& ) = delete;
+    ~git_handler();
 
-    GitHandler();
-    GitHandler( const GitHandler& ) = delete;
-    GitHandler( GitHandler&& ) = delete;
-    GitHandler& operator=( const GitHandler& ) = delete;
-    GitHandler& operator=( GitHandler&& ) = delete;
-    ~GitHandler();
-
-    bool addRepo( std::unique_ptr< base::Repo >&& repo, const std::string& username, const std::string& pass );
-    bool update() noexcept;
+    bool add_repo( std::unique_ptr< base::repo_wrapper >&& repo, const std::string& username, const std::string& pass );
+    void update() noexcept;
     void clear() noexcept;
 		
-    base::Repo* getRepo(const std::string& path) const noexcept;
-    const RepoStorage& getRepos() const noexcept;
+    base::repo_wrapper* getRepo(const std::string& path) const noexcept;
+    const repos& get_repos() const noexcept;
 
 //    NewBranchStorage newBranches();
 //    NewCommitStorage newCommits();
 
 private:
-    bool registerGitItemTypes();
+    bool register_git_items();
 
     //callbacks with params determined by the lib
     static int progress_cb(const char *str, int len, void *data);
@@ -47,13 +47,13 @@ private:
     static int cred_acquire_cb(git_cred **out, const char* url, const char* username_from_url, unsigned int allowed_typed, void* data);
 
 private:
-    RepoStorage mRepos;
+    repos m_repos;
 
-    static Credentials mCredentials;
-    static base::Repo* mCurrentRepo;
+    static credentials mCredentials;
+    static base::repo_wrapper* mCurrentRepo;
 
-    static NewBranchStorage mNewBranches;
-    static NewCommitStorage mNewCommits;
+    static new_braches m_new_branches;
+    static new_commits m_new_commits;
 };
 
 } //git_handler

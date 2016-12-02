@@ -30,21 +30,6 @@ endif(NOT Boost_FOUND)
 # LibGit2
 ################################
 
-include(ExternalProject)
-set(LIBGIT2_NAME libgit2)
-
-# Download and install LibGit2
-ExternalProject_Add(
-	${LIBGIT2_NAME}
-	GIT_REPOSITORY https://github.com/libgit2/libgit2.git
-	PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${LIBGIT2_NAME}
-	#INSTALL_DIR ${PROJECT_SOURCE_DIR}/${LIBGIT2_NAME}	
-	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>)
-
-ExternalProject_Get_Property(${LIBGIT2_NAME} install_dir)
-
-set(LIBGIT2_LIBRARY_DIRS ${install_dir}/lib)
-set(LIBGIT2_INCLUDE_DIRS ${install_dir}/include)
 set(LIBGIT2_LIB git2)
 
 ################################
@@ -57,12 +42,11 @@ set(GIT_HANDLER_TESTS_PROJECT_NAME GitHandlerTests)
 ################################
 # Includes and links
 ################################
-link_directories( ${LIBGIT2_LIBRARY_DIRS} 
-				  ${Boost_LIBRARY_DIRS} 
-				  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+link_directories( ${Boost_LIBRARY_DIRS}
+                  /usr/local/lib/
+                  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 include_directories(${Boost_INCLUDE_DIRS})
-include_directories(${LIBGIT2_INCLUDE_DIRS})
 
 include_directories("./")
 include_directories("./SRC")

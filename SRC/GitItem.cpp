@@ -6,7 +6,7 @@ namespace git_handler
 namespace item
 {
 
-enum class Type
+enum class type
 {
 	GIT_REPO,
 	GIT_REMOTE,
